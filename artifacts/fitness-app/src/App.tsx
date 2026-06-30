@@ -59,7 +59,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   }, [user, loading, navigate]);
 
   if (loading) return <LoadingScreen />;
-  if (!user) return null;
+  if (!user) return <LoadingScreen />;
   return <>{children}</>;
 }
 
