@@ -5,7 +5,7 @@
   "outputDirectory": "artifacts/fitness-app/dist/public",
   "rewrites": [
     {
-      "source": "/((?!.*\\..*).*)",
+      "source": "/((?!api(?:/|$))(?!.*\\..*).*)",
       "destination": "/index.html"
     }
   ]

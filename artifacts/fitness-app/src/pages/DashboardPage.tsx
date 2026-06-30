@@ -11,6 +11,7 @@ export default function DashboardPage() {
   const { data: progress } = useGetProgressChart({ weeks: 8 });
   const { data: workouts } = useListWorkouts({ limit: 5, offset: 0 });
   const workoutsList = Array.isArray(workouts) ? workouts : [];
+  const progressList = Array.isArray(progress) ? progress : [];
 
   const displayName = user?.email?.split("@")[0] ?? "Athlete";
   const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 17 ? "Good afternoon" : "Good evening";
@@ -58,7 +59,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Volume chart */}
-        {progress && progress.length > 0 && (
+        {progressList.length > 0 && (
           <div className="bg-card border border-border rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp size={16} className="text-primary" />
@@ -66,7 +67,7 @@ export default function DashboardPage() {
               <span className="text-xs text-muted-foreground ml-auto">8 weeks</span>
             </div>
             <ResponsiveContainer width="100%" height={100}>
-              <AreaChart data={progress} margin={{ top: 2, right: 2, left: -30, bottom: 0 }}>
+              <AreaChart data={progressList} margin={{ top: 2, right: 2, left: -30, bottom: 0 }}>
                 <defs>
                   <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(82 100% 50%)" stopOpacity={0.3} />
