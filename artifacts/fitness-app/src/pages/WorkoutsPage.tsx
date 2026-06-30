@@ -5,6 +5,7 @@ import { Plus, Dumbbell, ChevronRight } from "lucide-react";
 
 export default function WorkoutsPage() {
   const { data: workouts, isLoading } = useListWorkouts({ limit: 50, offset: 0 });
+  const workoutsList = Array.isArray(workouts) ? workouts : [];
 
   return (
     <AppShell
@@ -24,7 +25,7 @@ export default function WorkoutsPage() {
               <div key={i} className="h-20 bg-card border border-border rounded-2xl animate-pulse" />
             ))}
           </div>
-        ) : !workouts || workouts.length === 0 ? (
+        ) : workoutsList.length === 0 ? (
           <div className="flex flex-col items-center justify-center pt-24 text-center">
             <div className="w-16 h-16 bg-card border border-border rounded-2xl flex items-center justify-center mb-4">
               <Dumbbell size={28} className="text-muted-foreground" />
@@ -39,7 +40,7 @@ export default function WorkoutsPage() {
           </div>
         ) : (
           <div className="space-y-2 pt-2">
-            {workouts.map((w) => (
+            {workoutsList.map((w) => (
               <Link key={w.id} href={`/workouts/${w.id}`}>
                 <div className="bg-card border border-border rounded-2xl px-4 py-4 flex items-center justify-between active:scale-[0.99] transition-transform">
                   <div className="flex items-center gap-3">

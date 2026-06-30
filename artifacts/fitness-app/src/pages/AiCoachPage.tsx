@@ -15,6 +15,7 @@ export default function AiCoachPage() {
   const preloadWorkoutId = params.get("workoutId") ? parseInt(params.get("workoutId")!, 10) : null;
 
   const { data: workouts } = useListWorkouts({ limit: 20, offset: 0 });
+  const workoutsList = Array.isArray(workouts) ? workouts : [];
   const askCoach = useAskCoach();
 
   const [messages, setMessages] = useState<Message[]>([
@@ -73,7 +74,7 @@ export default function AiCoachPage() {
               className="flex-1 bg-transparent text-sm text-foreground focus:outline-none"
             >
               <option value="">No specific workout</option>
-              {workouts?.map((w) => (
+              {workoutsList.map((w) => (
                 <option key={w.id} value={w.id}>
                   {w.name} — {new Date(w.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </option>

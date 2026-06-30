@@ -7,6 +7,16 @@ import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListWorkoutsQueryKey, getGetStatsSummaryQueryKey } from "@workspace/api-client-react";
 
+function getErrorMessage(error: unknown): string {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim() !== "") {
+      return message;
+    }
+  }
+  return "Failed to save workout. Try again.";
+}
+
 export default function NewWorkoutPage() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
@@ -34,7 +44,7 @@ export default function NewWorkoutPage() {
           queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey() });
           navigate(`/workouts/${workout.id}`);
         },
-        onError: () => setError("Failed to save workout. Try again."),
+        onError: (error) => setError(getErrorMessage(error)),
       }
     );
   };

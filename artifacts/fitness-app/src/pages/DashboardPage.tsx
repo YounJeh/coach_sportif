@@ -10,6 +10,7 @@ export default function DashboardPage() {
   const { data: summary, isLoading: summaryLoading } = useGetStatsSummary();
   const { data: progress } = useGetProgressChart({ weeks: 8 });
   const { data: workouts } = useListWorkouts({ limit: 5, offset: 0 });
+  const workoutsList = Array.isArray(workouts) ? workouts : [];
 
   const displayName = user?.email?.split("@")[0] ?? "Athlete";
   const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 17 ? "Good afternoon" : "Good evening";
@@ -92,11 +93,11 @@ export default function DashboardPage() {
               <span className="text-xs text-primary font-medium">See all</span>
             </Link>
           </div>
-          {(!workouts || workouts.length === 0) ? (
+          {workoutsList.length === 0 ? (
             <EmptyWorkouts />
           ) : (
             <div className="space-y-2">
-              {workouts.slice(0, 5).map((w) => (
+              {workoutsList.slice(0, 5).map((w) => (
                 <Link key={w.id} href={`/workouts/${w.id}`}>
                   <div className="bg-card border border-border rounded-2xl px-4 py-3.5 flex items-center justify-between active:scale-[0.98] transition-transform">
                     <div>
