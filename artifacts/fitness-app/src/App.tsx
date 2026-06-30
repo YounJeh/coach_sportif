@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 import { initApiAuth } from "@/lib/api-client";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import AuthPage from "@/pages/AuthPage";
 import DashboardPage from "@/pages/DashboardPage";
 import WorkoutsPage from "@/pages/WorkoutsPage";
@@ -27,6 +28,23 @@ function LoadingScreen() {
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         <p className="text-xs text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+function ConfigErrorScreen() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center px-6">
+      <div className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <h1 className="text-lg font-semibold text-foreground">Configuration missing</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          This preview is missing Supabase environment variables.
+        </p>
+        <p className="mt-4 text-sm text-foreground">
+          Add <strong>VITE_SUPABASE_URL</strong> and <strong>VITE_SUPABASE_ANON_KEY</strong>
+          in Vercel Project Settings then redeploy.
+        </p>
       </div>
     </div>
   );
@@ -97,6 +115,10 @@ function Router() {
 }
 
 function App() {
+  if (!isSupabaseConfigured) {
+    return <ConfigErrorScreen />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

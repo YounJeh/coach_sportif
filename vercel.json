@@ -2,5 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm --filter @workspace/fitness-app build",
-  "outputDirectory": "artifacts/fitness-app/dist/public"
+  "outputDirectory": "artifacts/fitness-app/dist/public",
+  "rewrites": [
+    {
+      "source": "/((?!.*\\..*).*)",
+      "destination": "/index.html"
+    }
+  ]
 }

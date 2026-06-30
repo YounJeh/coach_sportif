@@ -8,12 +8,23 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    let isMounted = true;
+
+    const initSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!isMounted) return;
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+      } catch (error) {
+        console.error("Failed to initialize auth session", error);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    void initSession();
 
     // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -22,7 +33,10 @@ export function useAuth() {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return {
