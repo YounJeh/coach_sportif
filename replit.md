@@ -1,36 +1,57 @@
-# [Project name]
+# FitTrack
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A mobile-first fitness progress tracker. Log workouts, track sets with exercises, set goals, visualize progress charts, and get AI coaching after sessions.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/fitness-app run dev` — run the frontend (port 21558, served at `/`)
 - `pnpm run typecheck` — full typecheck across all packages
+- `pnpm run typecheck:libs` — rebuild lib declarations (run this after changing `lib/*`)
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/scripts run seed-exercises` — seed the 44 default exercises
+- Required env: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
+- Frontend: React + Vite, Tailwind CSS v4, wouter, TanStack Query, Recharts
+- API: Express 5 at `/api`
 - DB: PostgreSQL + Drizzle ORM
+- Auth: Supabase Auth (JWT verified on server via `SUPABASE_SERVICE_ROLE_KEY`)
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- AI: OpenAI via Replit AI proxy (ai-coach endpoint)
+- Build: esbuild (CJS bundle for server)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/fitness-app/` — React Vite frontend, served at `/`
+- `artifacts/api-server/` — Express 5 API server, served at `/api`
+- `lib/db/src/schema/` — Drizzle schema (exercises, workouts, workout_sets, goals)
+- `lib/api-spec/` — OpenAPI spec (source of truth for API contract)
+- `lib/api-client-react/` — Generated React Query hooks (from codegen)
+- `lib/api-zod/` — Generated Zod validation schemas (from codegen)
+- `scripts/src/seed-exercises.ts` — Exercise catalog seeder
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Contract-first API: OpenAPI spec → codegen → Zod schemas on server, React Query hooks on client
+- Supabase JWT middleware (`requireAuth`) extracts `userId` from JWT sub claim; all DB queries filter by `userId`
+- `date()` columns in Drizzle (string type) — Zod schemas coerce to `Date`, so server routes convert back with `.toISOString().split("T")[0]` before inserting
+- Drizzle `numeric()` columns return strings — server normalizes these to numbers before returning JSON
+- Dark mode applied globally via `class="dark"` on `<html>` — athletic dark theme with electric lime (`hsl(82 100% 50%)`) primary
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Auth**: Supabase email/password sign-in and sign-up
+- **Dashboard**: stats grid (total workouts, streak, this-week count, avg duration) + 8-week volume area chart + recent workouts
+- **Workout logging**: create workout → add sets per exercise (44 seeded exercises across all muscle groups)
+- **Goals**: create, track progress, and complete personal fitness goals with a progress bar
+- **Progress**: weekly volume + frequency line charts, personal records table
+- **AI Coach**: chat interface with optional workout context; uses OpenAI via Replit AI proxy
 
 ## User preferences
 
@@ -38,7 +59,9 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- After changing any `lib/*` package, run `pnpm run typecheck:libs` before checking leaf artifacts — stale declarations cause false type errors
+- Zod `coerce.date()` returns a `Date` object; Drizzle `date()` column expects a string — always convert when inserting
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` must be set as plain env vars (not just secrets) so Vite can embed them at build time
 
 ## Pointers
 
