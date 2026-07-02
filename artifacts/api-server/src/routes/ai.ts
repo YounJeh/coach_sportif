@@ -2,9 +2,9 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, workoutsTable, workoutSetsTable } from "@workspace/db";
 import { AskCoachBody } from "@workspace/api-zod";
-import { requireAuth, type AuthenticatedRequest } from "../middlewares/auth";
+import { requireAuth, type AuthenticatedRequest } from "../middlewares/auth.js";
 import { type Request } from "express";
-import { logger } from "../lib/logger";
+import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 

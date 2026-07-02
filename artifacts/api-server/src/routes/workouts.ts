@@ -12,7 +12,7 @@ import {
   AddWorkoutSetParams,
   AddWorkoutSetBody,
 } from "@workspace/api-zod";
-import { requireAuth, type AuthenticatedRequest } from "../middlewares/auth";
+import { requireAuth, type AuthenticatedRequest } from "../middlewares/auth.js";
 import { type Request } from "express";
 
 const router: IRouter = Router();
