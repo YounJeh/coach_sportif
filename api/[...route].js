@@ -1,3 +1,2 @@
-import app from "../artifacts/api-server/dist/app.mjs";
-
-export default app;
+const mod = require("../artifacts/api-server/dist/app.cjs");
+module.exports = mod.default ?? mod;
