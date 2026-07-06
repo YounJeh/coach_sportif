@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, sql, desc } from "drizzle-orm";
-import { db, workoutsTable, workoutSetsTable, exercisesTable } from "@workspace/db";
+import { eq, and, gte, lte, inArray, sql, desc } from "drizzle-orm";
+import { db, workoutsTable, workoutSetsTable } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/auth.js";
 import { type Request } from "express";
 
@@ -16,14 +16,13 @@ router.get("/stats/summary", requireAuth, async (req: Request, res): Promise<voi
     .orderBy(desc(workoutsTable.date));
 
   const totalWorkouts = workouts.length;
+  const workoutIds = workouts.map((w) => w.id);
 
-  const allSets = totalWorkouts > 0
+  const allSets = workoutIds.length > 0
     ? await db
         .select()
         .from(workoutSetsTable)
-        .where(
-          sql`${workoutSetsTable.workoutId} IN (SELECT id FROM workouts WHERE user_id = ${userId})`,
-        )
+        .where(inArray(workoutSetsTable.workoutId, workoutIds))
     : [];
 
   const totalVolumeKg = allSets.reduce(
@@ -123,7 +122,7 @@ router.get("/stats/progress", requireAuth, async (req: Request, res): Promise<vo
         and(
           eq(workoutsTable.userId, userId),
           gte(workoutsTable.date, weekStart.toISOString().split("T")[0]),
-          sql`${workoutsTable.date} <= ${weekEnd.toISOString().split("T")[0]}`,
+          lte(workoutsTable.date, weekEnd.toISOString().split("T")[0]),
         ),
       );
 
