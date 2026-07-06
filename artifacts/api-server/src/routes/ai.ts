@@ -9,7 +9,8 @@ import { logger } from "../lib/logger.js";
 const router: IRouter = Router();
 
 const REPLIT_AI_URL = "https://replit.openai.azure.com";
-const REPLIT_AI_TOKEN = process.env.REPL_ID;
+const AI_FALLBACK_REPLY =
+  "Great effort! Based on your workout, I can see you're putting in the work. Focus on progressive overload - aim to add a small amount of weight or an extra rep each session. Make sure you're recovering well with quality sleep and adequate protein (0.8-1g per pound of bodyweight). Keep showing up consistently and the results will come!";
 
 router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> => {
   const userId = (req as AuthenticatedRequest).userId;
@@ -43,12 +44,20 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
   }
 
   try {
+    const apiKey = process.env.REPLIT_AI_API_KEY;
+    if (!apiKey) {
+      logger.warn("REPLIT_AI_API_KEY is missing, using AI fallback response");
+      res.json({ reply: AI_FALLBACK_REPLY });
+      return;
+    }
+
     const { OpenAI } = await import("openai");
     const client = new OpenAI({
-      apiKey: process.env.REPLIT_AI_API_KEY ?? REPLIT_AI_TOKEN ?? "no-key",
+      apiKey,
       baseURL: `${REPLIT_AI_URL}/openai/deployments/gpt-5.1`,
+      timeout: 15_000,
       defaultHeaders: {
-        "api-key": process.env.REPLIT_AI_API_KEY ?? "",
+        "api-key": apiKey,
       },
     });
 
@@ -67,10 +76,7 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
     res.json({ reply });
   } catch (err) {
     logger.error({ err }, "AI coach request failed, using fallback");
-    res.json({
-      reply:
-        "Great effort! Based on your workout, I can see you're putting in the work. Focus on progressive overload — aim to add a small amount of weight or an extra rep each session. Make sure you're recovering well with quality sleep and adequate protein (0.8–1g per pound of bodyweight). Keep showing up consistently and the results will come!",
-    });
+    res.json({ reply: AI_FALLBACK_REPLY });
   }
 });
 

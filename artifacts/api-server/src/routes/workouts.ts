@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { db, workoutsTable, workoutSetsTable, exercisesTable } from "@workspace/db";
 import {
   ListWorkoutsQueryParams,
@@ -17,11 +17,33 @@ import { type Request } from "express";
 
 const router: IRouter = Router();
 
+async function loadWorkoutVolumeMap(workoutIds: number[]): Promise<Map<number, number>> {
+  if (workoutIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await db
+    .select({
+      workoutId: workoutSetsTable.workoutId,
+      totalVolume: sql<string>`sum(${workoutSetsTable.reps} * ${workoutSetsTable.weightKg}::numeric)`,
+    })
+    .from(workoutSetsTable)
+    .where(inArray(workoutSetsTable.workoutId, workoutIds))
+    .groupBy(workoutSetsTable.workoutId);
+
+  return new Map(rows.map((row) => [row.workoutId, Number(row.totalVolume)]));
+}
+
 router.get("/workouts", requireAuth, async (req: Request, res): Promise<void> => {
   const userId = (req as AuthenticatedRequest).userId;
   const parsed = ListWorkoutsQueryParams.safeParse(req.query);
-  const limit = parsed.success ? (parsed.data.limit ?? 20) : 20;
-  const offset = parsed.success ? (parsed.data.offset ?? 0) : 0;
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const limit = parsed.data.limit ?? 20;
+  const offset = parsed.data.offset ?? 0;
 
   const workouts = await db
     .select()
@@ -31,19 +53,12 @@ router.get("/workouts", requireAuth, async (req: Request, res): Promise<void> =>
     .limit(limit)
     .offset(offset);
 
-  const workoutsWithVolume = await Promise.all(
-    workouts.map(async (w) => {
-      const sets = await db
-        .select()
-        .from(workoutSetsTable)
-        .where(eq(workoutSetsTable.workoutId, w.id));
-      const totalVolume = sets.reduce(
-        (sum, s) => sum + s.reps * Number(s.weightKg),
-        0,
-      );
-      return { ...w, totalVolume, sets: [] };
-    }),
-  );
+  const volumeMap = await loadWorkoutVolumeMap(workouts.map((workout) => workout.id));
+  const workoutsWithVolume = workouts.map((workout) => ({
+    ...workout,
+    totalVolume: volumeMap.get(workout.id) ?? 0,
+    sets: [],
+  }));
 
   res.json(workoutsWithVolume);
 });

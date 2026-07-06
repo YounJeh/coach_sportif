@@ -1,10 +1,17 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, sql, desc } from "drizzle-orm";
-import { db, workoutsTable, workoutSetsTable, exercisesTable } from "@workspace/db";
+import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
+import { db, workoutsTable, workoutSetsTable } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/auth.js";
 import { type Request } from "express";
 
 const router: IRouter = Router();
+
+function formatDateOnly(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 router.get("/stats/summary", requireAuth, async (req: Request, res): Promise<void> => {
   const userId = (req as AuthenticatedRequest).userId;
@@ -104,9 +111,11 @@ router.get("/stats/summary", requireAuth, async (req: Request, res): Promise<voi
 
 router.get("/stats/progress", requireAuth, async (req: Request, res): Promise<void> => {
   const userId = (req as AuthenticatedRequest).userId;
-  const weeks = parseInt(String(req.query.weeks ?? "8"), 10) || 8;
+  const rawWeeks = parseInt(String(req.query.weeks ?? "8"), 10) || 8;
+  const weeks = Math.min(Math.max(rawWeeks, 1), 52);
 
   const points: Array<{ week: string; totalVolumeKg: number; workoutCount: number }> = [];
+  const buckets: Array<{ start: string; end: string; label: string }> = [];
 
   for (let i = weeks - 1; i >= 0; i--) {
     const weekStart = new Date();
@@ -116,29 +125,62 @@ router.get("/stats/progress", requireAuth, async (req: Request, res): Promise<vo
     weekEnd.setDate(weekStart.getDate() + 6);
     weekEnd.setHours(23, 59, 59, 999);
 
-    const weekWorkouts = await db
-      .select()
-      .from(workoutsTable)
-      .where(
-        and(
-          eq(workoutsTable.userId, userId),
-          gte(workoutsTable.date, weekStart.toISOString().split("T")[0]),
-          sql`${workoutsTable.date} <= ${weekEnd.toISOString().split("T")[0]}`,
-        ),
-      );
+    buckets.push({
+      start: formatDateOnly(weekStart),
+      end: formatDateOnly(weekEnd),
+      label: weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }),
+    });
+  }
 
-    let weekVolume = 0;
-    for (const w of weekWorkouts) {
-      const sets = await db
-        .select()
-        .from(workoutSetsTable)
-        .where(eq(workoutSetsTable.workoutId, w.id));
-      weekVolume += sets.reduce((sum, s) => sum + s.reps * Number(s.weightKg), 0);
+  const oldestWeekStart = buckets[0]?.start;
+  const latestWeekEnd = buckets[buckets.length - 1]?.end;
+
+  if (!oldestWeekStart || !latestWeekEnd) {
+    res.json(points);
+    return;
+  }
+
+  const workouts = await db
+    .select({ id: workoutsTable.id, date: workoutsTable.date })
+    .from(workoutsTable)
+    .where(
+      and(
+        eq(workoutsTable.userId, userId),
+        gte(workoutsTable.date, oldestWeekStart),
+        lte(workoutsTable.date, latestWeekEnd),
+      ),
+    );
+
+  const workoutIds = workouts.map((workout) => workout.id);
+  const volumeByWorkoutId = new Map<number, number>();
+
+  if (workoutIds.length > 0) {
+    const rows = await db
+      .select({
+        workoutId: workoutSetsTable.workoutId,
+        totalVolume: sql<string>`sum(${workoutSetsTable.reps} * ${workoutSetsTable.weightKg}::numeric)`,
+      })
+      .from(workoutSetsTable)
+      .where(inArray(workoutSetsTable.workoutId, workoutIds))
+      .groupBy(workoutSetsTable.workoutId);
+
+    for (const row of rows) {
+      volumeByWorkoutId.set(row.workoutId, Number(row.totalVolume));
     }
+  }
 
-    const label = weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  for (const bucket of buckets) {
+    const weekWorkouts = workouts.filter(
+      (workout) => workout.date >= bucket.start && workout.date <= bucket.end,
+    );
+
+    const weekVolume = weekWorkouts.reduce(
+      (sum, workout) => sum + (volumeByWorkoutId.get(workout.id) ?? 0),
+      0,
+    );
+
     points.push({
-      week: label,
+      week: bucket.label,
       totalVolumeKg: Math.round(weekVolume),
       workoutCount: weekWorkouts.length,
     });
@@ -151,33 +193,25 @@ router.get("/stats/personal-records", requireAuth, async (req: Request, res): Pr
   const userId = (req as AuthenticatedRequest).userId;
 
   const records = await db.execute(sql`
-    SELECT
+    SELECT DISTINCT ON (ws.exercise_id)
       ws.exercise_id as "exerciseId",
       ws.exercise_name as "exerciseName",
-      MAX(ws.weight_kg::numeric) as "maxWeightKg",
+      ws.weight_kg::numeric as "maxWeightKg",
       w.date as "achievedAt"
     FROM workout_sets ws
     JOIN workouts w ON ws.workout_id = w.id
     WHERE w.user_id = ${userId}
-    GROUP BY ws.exercise_id, ws.exercise_name, w.date
-    ORDER BY ws.exercise_name ASC
+    ORDER BY ws.exercise_id, ws.weight_kg::numeric DESC, w.date DESC
   `);
 
-  const prs: Record<number, { exerciseId: number; exerciseName: string; maxWeightKg: number; achievedAt: string }> = {};
-  for (const row of records.rows as Array<{ exerciseId: string; exerciseName: string; maxWeightKg: string; achievedAt: string }>) {
-    const eid = parseInt(row.exerciseId, 10);
-    const weight = Number(row.maxWeightKg);
-    if (!prs[eid] || weight > prs[eid].maxWeightKg) {
-      prs[eid] = {
-        exerciseId: eid,
-        exerciseName: row.exerciseName,
-        maxWeightKg: weight,
-        achievedAt: row.achievedAt,
-      };
-    }
-  }
+  const prs = (records.rows as Array<{ exerciseId: string; exerciseName: string; maxWeightKg: string; achievedAt: string }>).map((row) => ({
+    exerciseId: parseInt(row.exerciseId, 10),
+    exerciseName: row.exerciseName,
+    maxWeightKg: Number(row.maxWeightKg),
+    achievedAt: row.achievedAt,
+  }));
 
-  res.json(Object.values(prs));
+  res.json(prs);
 });
 
 export default router;
