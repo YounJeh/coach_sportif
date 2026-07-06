@@ -37,22 +37,22 @@ export default function DashboardPage() {
           <StatCard
             icon={<Dumbbell size={18} className="text-primary" />}
             label="Total Workouts"
-            value={summaryLoading ? "—" : summary ? String(summary.totalWorkouts) : "—"}
+            value={summaryLoading ? "—" : String(summary?.totalWorkouts ?? 0)}
           />
           <StatCard
             icon={<Flame size={18} className="text-orange-400" />}
             label="Current Streak"
-            value={summaryLoading ? "—" : summary ? `${summary.currentStreakDays}d` : "—"}
+            value={summaryLoading ? "—" : `${summary?.currentStreakDays ?? 0}d`}
           />
           <StatCard
             icon={<Calendar size={18} className="text-blue-400" />}
             label="This Week"
-            value={summaryLoading ? "—" : summary ? String(summary.workoutsThisWeek) : "—"}
+            value={summaryLoading ? "—" : String(summary?.workoutsThisWeek ?? 0)}
           />
           <StatCard
             icon={<Clock size={18} className="text-purple-400" />}
             label="Avg Duration"
-            value={summaryLoading ? "—" : summary ? `${summary.avgDurationMinutes}m` : "—"}
+            value={summaryLoading ? "—" : `${summary?.avgDurationMinutes ?? 0}m`}
           />
         </div>
 
