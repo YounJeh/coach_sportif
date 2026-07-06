@@ -12,7 +12,7 @@ A mobile-first fitness progress tracker. Log workouts, track sets with exercises
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/scripts run seed-exercises` — seed the 44 default exercises
-- Required env: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- Required env: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `OPENAI_API_KEY`
 
 ## Stack
 
@@ -23,7 +23,7 @@ A mobile-first fitness progress tracker. Log workouts, track sets with exercises
 - Auth: Supabase Auth (JWT verified on server via `SUPABASE_SERVICE_ROLE_KEY`)
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
-- AI: OpenAI via Replit AI proxy (ai-coach endpoint)
+- AI: OpenAI API (ai-coach endpoint, `OPENAI_API_KEY`; optional `OPENAI_MODEL`)
 - Build: esbuild (CJS bundle for server)
 
 ## Where things live
@@ -51,7 +51,7 @@ A mobile-first fitness progress tracker. Log workouts, track sets with exercises
 - **Workout logging**: create workout → add sets per exercise (44 seeded exercises across all muscle groups)
 - **Goals**: create, track progress, and complete personal fitness goals with a progress bar
 - **Progress**: weekly volume + frequency line charts, personal records table
-- **AI Coach**: chat interface with optional workout context; uses OpenAI via Replit AI proxy
+- **AI Coach**: chat interface with optional workout context; uses the OpenAI API with `OPENAI_API_KEY`
 
 ## User preferences
 

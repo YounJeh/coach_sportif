@@ -8,7 +8,7 @@ import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 
-const REPLIT_AI_URL = "https://replit.openai.azure.com";
+const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 const AI_FALLBACK_REPLY =
   "Great effort! Based on your workout, I can see you're putting in the work. Focus on progressive overload - aim to add a small amount of weight or an extra rep each session. Make sure you're recovering well with quality sleep and adequate protein (0.8-1g per pound of bodyweight). Keep showing up consistently and the results will come!";
 
@@ -44,9 +44,9 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
   }
 
   try {
-    const apiKey = process.env.REPLIT_AI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      logger.warn("REPLIT_AI_API_KEY is missing, using AI fallback response");
+      logger.warn("OPENAI_API_KEY is missing, using AI fallback response");
       res.json({ reply: AI_FALLBACK_REPLY });
       return;
     }
@@ -54,17 +54,13 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
     const { OpenAI } = await import("openai");
     const client = new OpenAI({
       apiKey,
-      baseURL: `${REPLIT_AI_URL}/openai/deployments/gpt-5.1`,
       timeout: 15_000,
-      defaultHeaders: {
-        "api-key": apiKey,
-      },
     });
 
     const systemPrompt = `You are an expert personal fitness coach. You provide motivating, practical, and evidence-based advice to help athletes improve their performance and reach their goals. Keep responses concise, friendly, and actionable — aim for 2-4 short paragraphs. Use specific numbers and suggestions based on the workout data when available.`;
 
     const completion = await client.chat.completions.create({
-      model: "gpt-5.1",
+      model: OPENAI_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: message + workoutContext },
