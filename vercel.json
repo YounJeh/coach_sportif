@@ -3,6 +3,12 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm rebuild esbuild && pnpm --filter @workspace/api-server build && pnpm --filter @workspace/fitness-app build",
   "outputDirectory": "artifacts/fitness-app/dist/public",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/[...route].js"
+    }
+  ],
   "functions": {
     "api/[...route].js": {
       "includeFiles": "artifacts/api-server/dist/**"
