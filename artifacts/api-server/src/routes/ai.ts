@@ -162,15 +162,29 @@ async function resolveObjectiveAndDeadline(userId: string, fallbackObjective: st
   return { objective, deadline };
 }
 
-async function persistPlannedSessionsInBackground(userId: string, sessions: NormalizedPlannedSession[]): Promise<void> {
-  try {
-    for (const session of sessions) {
-      await db
-        .insert(userSessionsTable)
-        .values({
-          userId,
-          goalId: session.goalId,
-          sessionDate: session.sessionDate,
+async function persistPlannedSessions(userId: string, sessions: NormalizedPlannedSession[]): Promise<number> {
+  let persistedCount = 0;
+
+  for (const session of sessions) {
+    await db
+      .insert(userSessionsTable)
+      .values({
+        userId,
+        goalId: session.goalId,
+        sessionDate: session.sessionDate,
+        modality: session.modality,
+        title: session.title,
+        targetDurationMin: session.targetDurationMin,
+        targetIntensityRpe:
+          session.targetIntensityRpe == null ? null : String(session.targetIntensityRpe),
+        status: session.status,
+        planData: session.planData,
+        resultData: session.resultData,
+        notes: session.notes,
+      })
+      .onConflictDoUpdate({
+        target: [userSessionsTable.userId, userSessionsTable.sessionDate],
+        set: {
           modality: session.modality,
           title: session.title,
           targetDurationMin: session.targetDurationMin,
@@ -179,28 +193,16 @@ async function persistPlannedSessionsInBackground(userId: string, sessions: Norm
           status: session.status,
           planData: session.planData,
           resultData: session.resultData,
+          goalId: session.goalId,
           notes: session.notes,
-        })
-        .onConflictDoUpdate({
-          target: [userSessionsTable.userId, userSessionsTable.sessionDate],
-          set: {
-            modality: session.modality,
-            title: session.title,
-            targetDurationMin: session.targetDurationMin,
-            targetIntensityRpe:
-              session.targetIntensityRpe == null ? null : String(session.targetIntensityRpe),
-            status: session.status,
-            planData: session.planData,
-            resultData: session.resultData,
-            goalId: session.goalId,
-            notes: session.notes,
-            updatedAt: new Date(),
-          },
-        });
-    }
-  } catch (err) {
-    logger.error({ err, userId }, "Failed to persist planned sessions in background");
+          updatedAt: new Date(),
+        },
+      });
+
+    persistedCount += 1;
   }
+
+  return persistedCount;
 }
 
 router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> => {
@@ -278,8 +280,9 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
     const briefingAthlete = extractBriefingAthlete(payload);
     const plannedSessions = normalizePlannedSessions(payload);
 
+    let persistedSessions = 0;
     if (plannedSessions.length > 0) {
-      void persistPlannedSessionsInBackground(userId, plannedSessions);
+      persistedSessions = await persistPlannedSessions(userId, plannedSessions);
     }
 
     const root = asObject(payload);
@@ -294,6 +297,15 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
       briefingAthlete,
       plannedSessions: plannedSessions.length,
     });
+
+    logger.info(
+      {
+        userId,
+        plannedSessions: plannedSessions.length,
+        persistedSessions,
+      },
+      "AI coach plan persisted",
+    );
   } catch (err) {
     logger.error({ err, userId }, "AI coach request failed, using fallback");
     res.json({ reply: AI_FALLBACK_REPLY, briefingAthlete: null, plannedSessions: 0 });
