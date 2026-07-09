@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
-import { db, workoutsTable, workoutSetsTable } from "@workspace/db";
+import { eq, and, desc } from "drizzle-orm";
+import { db, goalsTable, userSessionsTable, workoutsTable, workoutSetsTable } from "@workspace/db";
 import { AskCoachBody } from "@workspace/api-zod";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/auth.js";
 import { type Request } from "express";
@@ -8,9 +8,200 @@ import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+const COACH_API_BASE_URL = process.env.COACH_API_BASE_URL ?? "https://coach-sportif-ia-api-kvl55ihqia-ew.a.run.app";
 const AI_FALLBACK_REPLY =
   "Great effort! Based on your workout, I can see you're putting in the work. Focus on progressive overload - aim to add a small amount of weight or an extra rep each session. Make sure you're recovering well with quality sleep and adequate protein (0.8-1g per pound of bodyweight). Keep showing up consistently and the results will come!";
+
+type PlanningStatus = "planned" | "done" | "skipped" | "adapted";
+
+interface NormalizedPlannedSession {
+  goalId: number | null;
+  sessionDate: string;
+  modality: "running" | "strength" | "fitness" | "recovery";
+  title: string;
+  targetDurationMin: number;
+  targetIntensityRpe: number | null;
+  status: PlanningStatus;
+  notes: string | null;
+  planData: Record<string, unknown>;
+  resultData: Record<string, unknown>;
+}
+
+function asObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function asString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function toDateOnly(value: string): string | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toISOString().split("T")[0];
+}
+
+function normalizeModality(value: unknown): "running" | "strength" | "fitness" | "recovery" {
+  const raw = String(value ?? "").toLowerCase();
+  if (raw.includes("run")) return "running";
+  if (raw.includes("strength") || raw.includes("muscu")) return "strength";
+  if (raw.includes("recovery") || raw.includes("recover")) return "recovery";
+  return "fitness";
+}
+
+function normalizeStatus(value: unknown): PlanningStatus {
+  const raw = String(value ?? "").toLowerCase();
+  if (raw === "done" || raw === "skipped" || raw === "adapted") {
+    return raw;
+  }
+  return "planned";
+}
+
+function extractBriefingAthlete(payload: unknown): string | null {
+  const root = asObject(payload);
+  const briefing = asObject(root?.briefing);
+  const athlete = briefing?.athlete;
+
+  if (typeof athlete === "string") {
+    return athlete;
+  }
+  if (athlete && typeof athlete === "object") {
+    try {
+      return JSON.stringify(athlete);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function extractBriefingCoach(payload: unknown): string | null {
+  const root = asObject(payload);
+  const briefing = asObject(root?.briefing);
+  return asString(briefing?.coach);
+}
+
+function normalizePlannedSessions(payload: unknown): NormalizedPlannedSession[] {
+  const root = asObject(payload);
+  const plan = asObject(root?.plan);
+  const rawItems = Array.isArray(plan?.sessions)
+    ? plan.sessions.map((item) => asObject(item)).filter((item): item is Record<string, unknown> => item != null)
+    : [];
+  const normalized: NormalizedPlannedSession[] = [];
+
+  for (const item of rawItems) {
+    const sessionDate = asString(item.session_date);
+
+    if (!sessionDate) continue;
+
+    const dateOnly = toDateOnly(sessionDate);
+    if (!dateOnly) continue;
+
+    const duration =
+      asNumber(item.target_duration_min) ??
+      45;
+
+    const intensity = asNumber(item.target_intensity_rpe);
+    const planData = asObject(item.plan_data) ?? {};
+    const resultData = asObject(item.result_data) ?? {};
+    const goalId = asNumber(item.goal_id);
+
+    normalized.push({
+      goalId: goalId == null ? null : Math.round(goalId),
+      sessionDate: dateOnly,
+      modality: normalizeModality(item.modality),
+      title: asString(item.title) ?? "Planned session",
+      targetDurationMin: Math.max(1, Math.round(duration)),
+      targetIntensityRpe: intensity == null ? null : Math.max(1, Math.min(10, intensity)),
+      status: normalizeStatus(item.status),
+      notes: asString(item.notes),
+      planData,
+      resultData,
+    });
+  }
+
+  return normalized;
+}
+
+function extractAvailableSlots(message: string): string[] {
+  const slotRegex = /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)-(?:[01]\d|2[0-3]):[0-5]\d\b/g;
+  const matches = message.match(slotRegex) ?? [];
+  return Array.from(new Set(matches));
+}
+
+async function resolveObjectiveAndDeadline(userId: string, fallbackObjective: string): Promise<{ objective: string; deadline: string }> {
+  const [goal] = await db
+    .select()
+    .from(goalsTable)
+    .where(and(eq(goalsTable.userId, userId), eq(goalsTable.completed, false)))
+    .orderBy(desc(goalsTable.createdAt))
+    .limit(1);
+
+  const objective = goal?.title?.trim() || fallbackObjective;
+  const deadline =
+    (goal?.deadline ? toDateOnly(goal.deadline) : null) ??
+    toDateOnly(new Date(Date.now() + 1000 * 60 * 60 * 24 * 90).toISOString()) ??
+    new Date().toISOString().split("T")[0];
+
+  return { objective, deadline };
+}
+
+async function persistPlannedSessionsInBackground(userId: string, sessions: NormalizedPlannedSession[]): Promise<void> {
+  try {
+    for (const session of sessions) {
+      await db
+        .insert(userSessionsTable)
+        .values({
+          userId,
+          goalId: session.goalId,
+          sessionDate: session.sessionDate,
+          modality: session.modality,
+          title: session.title,
+          targetDurationMin: session.targetDurationMin,
+          targetIntensityRpe:
+            session.targetIntensityRpe == null ? null : String(session.targetIntensityRpe),
+          status: session.status,
+          planData: session.planData,
+          resultData: session.resultData,
+          notes: session.notes,
+        })
+        .onConflictDoUpdate({
+          target: [userSessionsTable.userId, userSessionsTable.sessionDate],
+          set: {
+            modality: session.modality,
+            title: session.title,
+            targetDurationMin: session.targetDurationMin,
+            targetIntensityRpe:
+              session.targetIntensityRpe == null ? null : String(session.targetIntensityRpe),
+            status: session.status,
+            planData: session.planData,
+            resultData: session.resultData,
+            goalId: session.goalId,
+            notes: session.notes,
+            updatedAt: new Date(),
+          },
+        });
+    }
+  } catch (err) {
+    logger.error({ err, userId }, "Failed to persist planned sessions in background");
+  }
+}
 
 router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> => {
   const userId = (req as AuthenticatedRequest).userId;
@@ -44,35 +235,68 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
   }
 
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      logger.warn("OPENAI_API_KEY is missing, using AI fallback response");
-      res.json({ reply: AI_FALLBACK_REPLY });
+    const { objective, deadline } = await resolveObjectiveAndDeadline(userId, message.trim());
+    const availableSlots = extractAvailableSlots(message);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+
+    let planResponse: Response;
+    try {
+      planResponse = await fetch(`${COACH_API_BASE_URL}/v1/plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          objective: `${objective}${workoutContext}`.trim(),
+          deadline,
+          available_slots: availableSlots,
+          off_days: [],
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!planResponse.ok) {
+      const body = await planResponse.text();
+      logger.error(
+        {
+          status: planResponse.status,
+          body,
+          userId,
+        },
+        "Coach IA API returned an error",
+      );
+      res.json({ reply: AI_FALLBACK_REPLY, briefingAthlete: null, plannedSessions: 0 });
       return;
     }
 
-    const { OpenAI } = await import("openai");
-    const client = new OpenAI({
-      apiKey,
-      timeout: 15_000,
+    const payload = (await planResponse.json()) as unknown;
+  const briefingCoach = extractBriefingCoach(payload);
+    const briefingAthlete = extractBriefingAthlete(payload);
+    const plannedSessions = normalizePlannedSessions(payload);
+
+    if (plannedSessions.length > 0) {
+      void persistPlannedSessionsInBackground(userId, plannedSessions);
+    }
+
+    const root = asObject(payload);
+    const externalReply = asString(root?.reply) ?? asString(root?.message);
+    const reply =
+      externalReply ??
+      briefingCoach ??
+      "Plan generated successfully. Your sessions are being saved to your planning tab.";
+
+    res.json({
+      reply,
+      briefingAthlete,
+      plannedSessions: plannedSessions.length,
     });
-
-    const systemPrompt = `You are an expert personal fitness coach. You provide motivating, practical, and evidence-based advice to help athletes improve their performance and reach their goals. Keep responses concise, friendly, and actionable — aim for 2-4 short paragraphs. Use specific numbers and suggestions based on the workout data when available.`;
-
-    const completion = await client.chat.completions.create({
-      model: OPENAI_MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: message + workoutContext },
-      ],
-      max_tokens: 500,
-    });
-
-    const reply = completion.choices[0]?.message?.content ?? "Great work today! Keep up the consistency.";
-    res.json({ reply });
   } catch (err) {
-    logger.error({ err }, "AI coach request failed, using fallback");
-    res.json({ reply: AI_FALLBACK_REPLY });
+    logger.error({ err, userId }, "AI coach request failed, using fallback");
+    res.json({ reply: AI_FALLBACK_REPLY, briefingAthlete: null, plannedSessions: 0 });
   }
 });
 

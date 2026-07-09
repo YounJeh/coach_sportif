@@ -479,7 +479,9 @@ export const AskCoachBody = zod.object({
 })
 
 export const AskCoachResponse = zod.object({
-  "reply": zod.string()
+  "reply": zod.string(),
+  "briefingAthlete": zod.string().nullish(),
+  "plannedSessions": zod.number().optional()
 })
 
 

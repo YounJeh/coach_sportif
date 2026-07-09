@@ -8,4 +8,7 @@
 
 export interface CoachResponse {
   reply: string;
+  /** @nullable */
+  briefingAthlete?: string | null;
+  plannedSessions?: number;
 }

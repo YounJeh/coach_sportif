@@ -41,7 +41,14 @@ export default function AiCoachPage() {
       { data: { message: msg, workoutId: selectedWorkoutId ?? null } },
       {
         onSuccess: (data) => {
-          setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
+          setMessages((prev) => {
+            const next = [...prev];
+            if (data.briefingAthlete) {
+              next.push({ role: "assistant", content: data.briefingAthlete });
+            }
+            next.push({ role: "assistant", content: data.reply });
+            return next;
+          });
         },
         onError: () => {
           setMessages((prev) => [
