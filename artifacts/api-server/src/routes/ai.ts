@@ -257,15 +257,6 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
     const { objective, deadline } = await resolveObjectiveAndDeadline(userId, message.trim());
     const availableSlots = extractAvailableSlots(message);
 
-    logger.info(
-      {
-        userId,
-        deadline,
-        availableSlotsCount: availableSlots.length,
-      },
-      "Calling coach API",
-    );
-
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20_000);
 
@@ -302,49 +293,10 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
     }
 
     const payload = (await planResponse.json()) as unknown;
-    const rootPayload = asObject(payload);
-    const planPayload = asObject(rootPayload?.plan);
-
-    logger.info(
-      {
-        userId,
-        payloadKeys: rootPayload ? Object.keys(rootPayload) : [],
-        planKeys: planPayload ? Object.keys(planPayload) : [],
-        hasPlanSessionsArray: Array.isArray(planPayload?.sessions),
-        planSessionsArrayLength: Array.isArray(planPayload?.sessions) ? planPayload.sessions.length : 0,
-      },
-      "Coach API payload received",
-    );
 
     const briefingCoach = extractBriefingCoach(payload);
     const briefingAthlete = extractBriefingAthlete(payload);
     const plannedSessions = normalizePlannedSessions(payload);
-
-    if (plannedSessions.length === 0) {
-      logger.warn(
-        {
-          userId,
-          briefingAthlete,
-          briefingCoach,
-        },
-        "No planned sessions could be normalized from coach payload",
-      );
-    } else {
-      const first = plannedSessions[0];
-      logger.info(
-        {
-          userId,
-          normalizedCount: plannedSessions.length,
-          firstSession: {
-            sessionDate: first.sessionDate,
-            title: first.title,
-            modality: first.modality,
-            duration: first.targetDurationMin,
-          },
-        },
-        "Coach sessions normalized",
-      );
-    }
 
     let persistedSessions = 0;
     if (plannedSessions.length > 0) {
