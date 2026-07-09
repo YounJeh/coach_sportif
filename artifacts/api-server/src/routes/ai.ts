@@ -165,26 +165,14 @@ async function resolveObjectiveAndDeadline(userId: string, fallbackObjective: st
 async function persistPlannedSessions(userId: string, sessions: NormalizedPlannedSession[]): Promise<number> {
   let persistedCount = 0;
 
-  for (const session of sessions) {
-    await db
-      .insert(userSessionsTable)
-      .values({
-        userId,
-        goalId: session.goalId,
-        sessionDate: session.sessionDate,
-        modality: session.modality,
-        title: session.title,
-        targetDurationMin: session.targetDurationMin,
-        targetIntensityRpe:
-          session.targetIntensityRpe == null ? null : String(session.targetIntensityRpe),
-        status: session.status,
-        planData: session.planData,
-        resultData: session.resultData,
-        notes: session.notes,
-      })
-      .onConflictDoUpdate({
-        target: [userSessionsTable.userId, userSessionsTable.sessionDate],
-        set: {
+  for (const [index, session] of sessions.entries()) {
+    try {
+      await db
+        .insert(userSessionsTable)
+        .values({
+          userId,
+          goalId: session.goalId,
+          sessionDate: session.sessionDate,
           modality: session.modality,
           title: session.title,
           targetDurationMin: session.targetDurationMin,
@@ -193,13 +181,40 @@ async function persistPlannedSessions(userId: string, sessions: NormalizedPlanne
           status: session.status,
           planData: session.planData,
           resultData: session.resultData,
-          goalId: session.goalId,
           notes: session.notes,
-          updatedAt: new Date(),
-        },
-      });
+        })
+        .onConflictDoUpdate({
+          target: [userSessionsTable.userId, userSessionsTable.sessionDate],
+          set: {
+            modality: session.modality,
+            title: session.title,
+            targetDurationMin: session.targetDurationMin,
+            targetIntensityRpe:
+              session.targetIntensityRpe == null ? null : String(session.targetIntensityRpe),
+            status: session.status,
+            planData: session.planData,
+            resultData: session.resultData,
+            goalId: session.goalId,
+            notes: session.notes,
+            updatedAt: new Date(),
+          },
+        });
 
-    persistedCount += 1;
+      persistedCount += 1;
+    } catch (err) {
+      logger.error(
+        {
+          err,
+          userId,
+          sessionIndex: index,
+          sessionDate: session.sessionDate,
+          title: session.title,
+          modality: session.modality,
+        },
+        "Failed to upsert user session",
+      );
+      throw err;
+    }
   }
 
   return persistedCount;
@@ -240,6 +255,15 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
     const { objective, deadline } = await resolveObjectiveAndDeadline(userId, message.trim());
     const availableSlots = extractAvailableSlots(message);
 
+    logger.info(
+      {
+        userId,
+        deadline,
+        availableSlotsCount: availableSlots.length,
+      },
+      "Calling coach API",
+    );
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20_000);
 
@@ -276,9 +300,49 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
     }
 
     const payload = (await planResponse.json()) as unknown;
-  const briefingCoach = extractBriefingCoach(payload);
+    const rootPayload = asObject(payload);
+    const planPayload = asObject(rootPayload?.plan);
+
+    logger.info(
+      {
+        userId,
+        payloadKeys: rootPayload ? Object.keys(rootPayload) : [],
+        planKeys: planPayload ? Object.keys(planPayload) : [],
+        hasPlanSessionsArray: Array.isArray(planPayload?.sessions),
+        planSessionsArrayLength: Array.isArray(planPayload?.sessions) ? planPayload.sessions.length : 0,
+      },
+      "Coach API payload received",
+    );
+
+    const briefingCoach = extractBriefingCoach(payload);
     const briefingAthlete = extractBriefingAthlete(payload);
     const plannedSessions = normalizePlannedSessions(payload);
+
+    if (plannedSessions.length === 0) {
+      logger.warn(
+        {
+          userId,
+          briefingAthlete,
+          briefingCoach,
+        },
+        "No planned sessions could be normalized from coach payload",
+      );
+    } else {
+      const first = plannedSessions[0];
+      logger.info(
+        {
+          userId,
+          normalizedCount: plannedSessions.length,
+          firstSession: {
+            sessionDate: first.sessionDate,
+            title: first.title,
+            modality: first.modality,
+            duration: first.targetDurationMin,
+          },
+        },
+        "Coach sessions normalized",
+      );
+    }
 
     let persistedSessions = 0;
     if (plannedSessions.length > 0) {
