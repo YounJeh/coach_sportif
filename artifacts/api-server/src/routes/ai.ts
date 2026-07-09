@@ -11,6 +11,7 @@ const router: IRouter = Router();
 const COACH_API_BASE_URL = process.env.COACH_API_BASE_URL ?? "https://coach-sportif-ia-api-kvl55ihqia-ew.a.run.app";
 const AI_FALLBACK_REPLY =
   "Great effort! Based on your workout, I can see you're putting in the work. Focus on progressive overload - aim to add a small amount of weight or an extra rep each session. Make sure you're recovering well with quality sleep and adequate protein (0.8-1g per pound of bodyweight). Keep showing up consistently and the results will come!";
+const DEFAULT_AVAILABLE_SLOTS = ["Mon-07:00", "Sun-20:00"] as const;
 
 type PlanningStatus = "planned" | "done" | "skipped" | "adapted";
 
@@ -142,7 +143,8 @@ function normalizePlannedSessions(payload: unknown): NormalizedPlannedSession[] 
 function extractAvailableSlots(message: string): string[] {
   const slotRegex = /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)-(?:[01]\d|2[0-3]):[0-5]\d\b/g;
   const matches = message.match(slotRegex) ?? [];
-  return Array.from(new Set(matches));
+  const extracted = Array.from(new Set(matches));
+  return extracted.length > 0 ? extracted : [...DEFAULT_AVAILABLE_SLOTS];
 }
 
 async function resolveObjectiveAndDeadline(userId: string, fallbackObjective: string): Promise<{ objective: string; deadline: string }> {
