@@ -101,6 +101,141 @@ export interface GoalUpdate {
   completed?: boolean;
 }
 
+export type PlanningSessionModality = typeof PlanningSessionModality[keyof typeof PlanningSessionModality];
+
+
+export const PlanningSessionModality = {
+  running: 'running',
+  strength: 'strength',
+  fitness: 'fitness',
+  recovery: 'recovery',
+} as const;
+
+export type PlanningSessionStatus = typeof PlanningSessionStatus[keyof typeof PlanningSessionStatus];
+
+
+export const PlanningSessionStatus = {
+  planned: 'planned',
+  done: 'done',
+  skipped: 'skipped',
+  adapted: 'adapted',
+} as const;
+
+export type PlanningSessionPlanData = { [key: string]: unknown };
+
+export type PlanningSessionResultData = { [key: string]: unknown };
+
+export interface PlanningSession {
+  id: number;
+  userId: string;
+  /** @nullable */
+  goalId: number | null;
+  sessionDate: string;
+  modality: PlanningSessionModality;
+  title: string;
+  targetDurationMin: number;
+  /** @nullable */
+  targetIntensityRpe: number | null;
+  status: PlanningSessionStatus;
+  planData: PlanningSessionPlanData;
+  resultData: PlanningSessionResultData;
+  /** @nullable */
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PlanningSessionInputModality = typeof PlanningSessionInputModality[keyof typeof PlanningSessionInputModality];
+
+
+export const PlanningSessionInputModality = {
+  running: 'running',
+  strength: 'strength',
+  fitness: 'fitness',
+  recovery: 'recovery',
+} as const;
+
+export type PlanningSessionInputStatus = typeof PlanningSessionInputStatus[keyof typeof PlanningSessionInputStatus];
+
+
+export const PlanningSessionInputStatus = {
+  planned: 'planned',
+  done: 'done',
+  skipped: 'skipped',
+  adapted: 'adapted',
+} as const;
+
+export type PlanningSessionInputPlanData = { [key: string]: unknown };
+
+export type PlanningSessionInputResultData = { [key: string]: unknown };
+
+export interface PlanningSessionInput {
+  /** @nullable */
+  goalId?: number | null;
+  sessionDate: string;
+  modality: PlanningSessionInputModality;
+  /** @minLength 1 */
+  title: string;
+  /** @minimum 1 */
+  targetDurationMin: number;
+  /**
+     * @minimum 1
+     * @maximum 10
+     * @nullable
+     */
+  targetIntensityRpe?: number | null;
+  status?: PlanningSessionInputStatus;
+  planData?: PlanningSessionInputPlanData;
+  resultData?: PlanningSessionInputResultData;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export type PlanningSessionUpdateModality = typeof PlanningSessionUpdateModality[keyof typeof PlanningSessionUpdateModality];
+
+
+export const PlanningSessionUpdateModality = {
+  running: 'running',
+  strength: 'strength',
+  fitness: 'fitness',
+  recovery: 'recovery',
+} as const;
+
+export type PlanningSessionUpdateStatus = typeof PlanningSessionUpdateStatus[keyof typeof PlanningSessionUpdateStatus];
+
+
+export const PlanningSessionUpdateStatus = {
+  planned: 'planned',
+  done: 'done',
+  skipped: 'skipped',
+  adapted: 'adapted',
+} as const;
+
+export type PlanningSessionUpdatePlanData = { [key: string]: unknown };
+
+export type PlanningSessionUpdateResultData = { [key: string]: unknown };
+
+export interface PlanningSessionUpdate {
+  /** @nullable */
+  goalId?: number | null;
+  sessionDate?: string;
+  modality?: PlanningSessionUpdateModality;
+  title?: string;
+  /** @minimum 1 */
+  targetDurationMin?: number;
+  /**
+     * @minimum 1
+     * @maximum 10
+     * @nullable
+     */
+  targetIntensityRpe?: number | null;
+  status?: PlanningSessionUpdateStatus;
+  planData?: PlanningSessionUpdatePlanData;
+  resultData?: PlanningSessionUpdateResultData;
+  /** @nullable */
+  notes?: string | null;
+}
+
 export interface StatsSummary {
   totalWorkouts: number;
   totalVolumeKg: number;

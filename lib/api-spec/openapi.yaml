@@ -15,6 +15,8 @@ tags:
     description: Exercise catalog
   - name: goals
     description: Fitness goals
+  - name: planning
+    description: User planning sessions
   - name: stats
     description: Progress statistics
   - name: ai
@@ -256,6 +258,76 @@ paths:
       operationId: deleteGoal
       tags: [goals]
       summary: Delete a goal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /planning/sessions:
+    get:
+      operationId: listPlanningSessions
+      tags: [planning]
+      summary: List all planning sessions for the authenticated user
+      responses:
+        "200":
+          description: List of planning sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlanningSession"
+    post:
+      operationId: createPlanningSession
+      tags: [planning]
+      summary: Create a new planning session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanningSessionInput"
+      responses:
+        "201":
+          description: Created planning session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanningSession"
+
+  /planning/sessions/{id}:
+    patch:
+      operationId: updatePlanningSession
+      tags: [planning]
+      summary: Update a planning session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanningSessionUpdate"
+      responses:
+        "200":
+          description: Updated planning session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanningSession"
+    delete:
+      operationId: deletePlanningSession
+      tags: [planning]
+      summary: Delete a planning session
       parameters:
         - name: id
           in: path
@@ -514,6 +586,128 @@ components:
           format: date
         completed:
           type: boolean
+
+    PlanningSession:
+      type: object
+      required:
+        [
+          id,
+          userId,
+          goalId,
+          sessionDate,
+          modality,
+          title,
+          targetDurationMin,
+          targetIntensityRpe,
+          status,
+          planData,
+          resultData,
+          notes,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        goalId:
+          type: ["integer", "null"]
+        sessionDate:
+          type: string
+          format: date
+        modality:
+          type: string
+          enum: [running, strength, fitness, recovery]
+        title:
+          type: string
+        targetDurationMin:
+          type: integer
+        targetIntensityRpe:
+          type: ["number", "null"]
+        status:
+          type: string
+          enum: [planned, done, skipped, adapted]
+        planData:
+          type: object
+          additionalProperties: true
+        resultData:
+          type: object
+          additionalProperties: true
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PlanningSessionInput:
+      type: object
+      required: [sessionDate, modality, title, targetDurationMin]
+      properties:
+        goalId:
+          type: ["integer", "null"]
+        sessionDate:
+          type: string
+          format: date
+        modality:
+          type: string
+          enum: [running, strength, fitness, recovery]
+        title:
+          type: string
+          minLength: 1
+        targetDurationMin:
+          type: integer
+          minimum: 1
+        targetIntensityRpe:
+          type: ["number", "null"]
+          minimum: 1
+          maximum: 10
+        status:
+          type: string
+          enum: [planned, done, skipped, adapted]
+        planData:
+          type: object
+          additionalProperties: true
+        resultData:
+          type: object
+          additionalProperties: true
+        notes:
+          type: ["string", "null"]
+
+    PlanningSessionUpdate:
+      type: object
+      properties:
+        goalId:
+          type: ["integer", "null"]
+        sessionDate:
+          type: string
+          format: date
+        modality:
+          type: string
+          enum: [running, strength, fitness, recovery]
+        title:
+          type: string
+        targetDurationMin:
+          type: integer
+          minimum: 1
+        targetIntensityRpe:
+          type: ["number", "null"]
+          minimum: 1
+          maximum: 10
+        status:
+          type: string
+          enum: [planned, done, skipped, adapted]
+        planData:
+          type: object
+          additionalProperties: true
+        resultData:
+          type: object
+          additionalProperties: true
+        notes:
+          type: ["string", "null"]
 
     StatsSummary:
       type: object

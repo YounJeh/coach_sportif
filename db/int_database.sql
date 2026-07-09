@@ -48,9 +48,30 @@ CREATE TABLE IF NOT EXISTS goals (
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  goal_id INTEGER NULL REFERENCES goals(id) ON DELETE SET NULL,
+  session_date DATE NOT NULL,
+  modality TEXT NOT NULL CHECK (modality IN ('running', 'strength', 'fitness', 'recovery')),
+  title TEXT NOT NULL,
+  target_duration_min INTEGER NOT NULL CHECK (target_duration_min > 0),
+  target_intensity_rpe NUMERIC(3, 1) NULL CHECK (target_intensity_rpe BETWEEN 1 AND 10),
+  status TEXT NOT NULL DEFAULT 'planned'
+    CHECK (status IN ('planned', 'done', 'skipped', 'adapted')),
+  plan_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  result_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  notes TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, session_date)
+);
+
 CREATE INDEX IF NOT EXISTS idx_workouts_user_date ON workouts(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_goals_user_completed ON goals(user_id, completed);
 CREATE INDEX IF NOT EXISTS idx_workout_sets_workout_id ON workout_sets(workout_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_date ON user_sessions(user_id, session_date);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_status_date ON user_sessions(user_id, status, session_date);
 
 -- -----------------------------------------------------------------------------
 -- New user profiling and readiness tables

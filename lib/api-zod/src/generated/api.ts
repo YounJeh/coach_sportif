@@ -313,6 +313,121 @@ export const DeleteGoalResponse = zod.void()
 
 
 /**
+ * @summary List all planning sessions for the authenticated user
+ */
+export const ListPlanningSessionsResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "goalId": zod.number().nullable(),
+  "sessionDate": zod.coerce.date(),
+  "modality": zod.enum(['running', 'strength', 'fitness', 'recovery']),
+  "title": zod.string(),
+  "targetDurationMin": zod.number(),
+  "targetIntensityRpe": zod.number().nullable(),
+  "status": zod.enum(['planned', 'done', 'skipped', 'adapted']),
+  "planData": zod.record(zod.string(), zod.unknown()),
+  "resultData": zod.record(zod.string(), zod.unknown()),
+  "notes": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListPlanningSessionsResponse = zod.array(ListPlanningSessionsResponseItem)
+
+
+/**
+ * @summary Create a new planning session
+ */
+
+
+export const createPlanningSessionBodyTargetIntensityRpeMax = 10;
+
+
+
+export const CreatePlanningSessionBody = zod.object({
+  "goalId": zod.number().nullish(),
+  "sessionDate": zod.coerce.date(),
+  "modality": zod.enum(['running', 'strength', 'fitness', 'recovery']),
+  "title": zod.string().min(1),
+  "targetDurationMin": zod.number().min(1),
+  "targetIntensityRpe": zod.number().min(1).max(createPlanningSessionBodyTargetIntensityRpeMax).nullish(),
+  "status": zod.enum(['planned', 'done', 'skipped', 'adapted']).optional(),
+  "planData": zod.record(zod.string(), zod.unknown()).optional(),
+  "resultData": zod.record(zod.string(), zod.unknown()).optional(),
+  "notes": zod.string().nullish()
+})
+
+export const CreatePlanningSessionResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "goalId": zod.number().nullable(),
+  "sessionDate": zod.coerce.date(),
+  "modality": zod.enum(['running', 'strength', 'fitness', 'recovery']),
+  "title": zod.string(),
+  "targetDurationMin": zod.number(),
+  "targetIntensityRpe": zod.number().nullable(),
+  "status": zod.enum(['planned', 'done', 'skipped', 'adapted']),
+  "planData": zod.record(zod.string(), zod.unknown()),
+  "resultData": zod.record(zod.string(), zod.unknown()),
+  "notes": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update a planning session
+ */
+export const UpdatePlanningSessionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const updatePlanningSessionBodyTargetIntensityRpeMax = 10;
+
+
+
+export const UpdatePlanningSessionBody = zod.object({
+  "goalId": zod.number().nullish(),
+  "sessionDate": zod.coerce.date().optional(),
+  "modality": zod.enum(['running', 'strength', 'fitness', 'recovery']).optional(),
+  "title": zod.string().optional(),
+  "targetDurationMin": zod.number().min(1).optional(),
+  "targetIntensityRpe": zod.number().min(1).max(updatePlanningSessionBodyTargetIntensityRpeMax).nullish(),
+  "status": zod.enum(['planned', 'done', 'skipped', 'adapted']).optional(),
+  "planData": zod.record(zod.string(), zod.unknown()).optional(),
+  "resultData": zod.record(zod.string(), zod.unknown()).optional(),
+  "notes": zod.string().nullish()
+})
+
+export const UpdatePlanningSessionResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "goalId": zod.number().nullable(),
+  "sessionDate": zod.coerce.date(),
+  "modality": zod.enum(['running', 'strength', 'fitness', 'recovery']),
+  "title": zod.string(),
+  "targetDurationMin": zod.number(),
+  "targetIntensityRpe": zod.number().nullable(),
+  "status": zod.enum(['planned', 'done', 'skipped', 'adapted']),
+  "planData": zod.record(zod.string(), zod.unknown()),
+  "resultData": zod.record(zod.string(), zod.unknown()),
+  "notes": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete a planning session
+ */
+export const DeletePlanningSessionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeletePlanningSessionResponse = zod.void()
+
+
+/**
  * @summary Get a stats summary for the current user (total workouts, volume, streaks)
  */
 export const GetStatsSummaryResponse = zod.object({

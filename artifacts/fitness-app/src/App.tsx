@@ -10,7 +10,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import WorkoutsPage from "@/pages/WorkoutsPage";
 import NewWorkoutPage from "@/pages/NewWorkoutPage";
 import WorkoutDetailPage from "@/pages/WorkoutDetailPage";
-import GoalsPage from "@/pages/GoalsPage";
+import PlanningPage from "@/pages/PlanningPage";
 import ProgressPage from "@/pages/ProgressPage";
 import AiCoachPage from "@/pages/AiCoachPage";
 import NotFound from "@/pages/not-found";
@@ -81,8 +81,11 @@ function Router() {
       <Route path="/workouts">
         {() => <AuthGuard><WorkoutsPage /></AuthGuard>}
       </Route>
+      <Route path="/planning">
+        {() => <AuthGuard><PlanningPage /></AuthGuard>}
+      </Route>
       <Route path="/goals">
-        {() => <AuthGuard><GoalsPage /></AuthGuard>}
+        {() => <AuthGuard><Redirect to="/planning" /></AuthGuard>}
       </Route>
       <Route path="/progress">
         {() => <AuthGuard><ProgressPage /></AuthGuard>}

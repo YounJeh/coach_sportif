@@ -1,10 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, History, Target, TrendingUp, Bot } from "lucide-react";
+import { LayoutDashboard, History, CalendarDays, TrendingUp, Bot } from "lucide-react";
 
 const tabs = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Home" },
   { path: "/workouts", icon: History, label: "History" },
-  { path: "/goals", icon: Target, label: "Goals" },
+  { path: "/planning", icon: CalendarDays, label: "Planning" },
   { path: "/progress", icon: TrendingUp, label: "Progress" },
   { path: "/ai-coach", icon: Bot, label: "Coach" },
 ];
