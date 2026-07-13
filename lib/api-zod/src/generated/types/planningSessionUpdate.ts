@@ -11,6 +11,7 @@ import type { PlanningSessionUpdateResultData } from './planningSessionUpdateRes
 import type { PlanningSessionUpdateStatus } from './planningSessionUpdateStatus';
 
 export interface PlanningSessionUpdate {
+  planId?: number;
   /** @nullable */
   goalId?: number | null;
   sessionDate?: Date;

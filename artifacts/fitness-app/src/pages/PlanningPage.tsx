@@ -1,10 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  useListPlanningPlans,
+  useCreatePlanningPlan,
   useListPlanningSessions,
   useCreatePlanningSession,
   useUpdatePlanningSession,
   useDeletePlanningSession,
+  getListPlanningPlansQueryKey,
   getListPlanningSessionsQueryKey,
+  type PlanningPlan,
   type PlanningSession,
   type PlanningSessionInputModality,
   type PlanningSessionStatus,
@@ -44,10 +48,19 @@ function formatDate(value: string): string {
 
 export default function PlanningPage() {
   const queryClient = useQueryClient();
-  const { data: sessions, isLoading } = useListPlanningSessions();
+  const { data: plans, isLoading: isLoadingPlans } = useListPlanningPlans();
+  const createPlan = useCreatePlanningPlan();
+  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+
+  const sessionParams = selectedPlanId != null ? { planId: selectedPlanId } : undefined;
+  const { data: sessions, isLoading } = useListPlanningSessions(sessionParams);
   const createSession = useCreatePlanningSession();
   const updateSession = useUpdatePlanningSession();
   const deleteSession = useDeletePlanningSession();
+
+  const [showPlanForm, setShowPlanForm] = useState(false);
+  const [planName, setPlanName] = useState("");
+  const [planError, setPlanError] = useState("");
 
   const [showForm, setShowForm] = useState(false);
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().slice(0, 10));
@@ -59,8 +72,21 @@ export default function PlanningPage() {
   const [formError, setFormError] = useState("");
   const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: getListPlanningSessionsQueryKey() });
+  const invalidateSessions = () =>
+    queryClient.invalidateQueries({ queryKey: getListPlanningSessionsQueryKey(sessionParams) });
+
+  const invalidatePlans = () =>
+    queryClient.invalidateQueries({ queryKey: getListPlanningPlansQueryKey() });
+
+  const hasPlans = (plans?.length ?? 0) > 0;
+
+  useEffect(() => {
+    if (selectedPlanId != null || !plans || plans.length === 0) {
+      return;
+    }
+
+    setSelectedPlanId(plans[0].id);
+  }, [plans, selectedPlanId]);
 
   const resetForm = () => {
     setShowForm(false);
@@ -90,6 +116,11 @@ export default function PlanningPage() {
     e.preventDefault();
     setFormError("");
 
+    if (selectedPlanId == null) {
+      setFormError("Create or select a planning first");
+      return;
+    }
+
     const duration = parseInt(targetDurationMin, 10);
     const intensity = targetIntensityRpe.trim() ? parseFloat(targetIntensityRpe) : undefined;
 
@@ -111,6 +142,7 @@ export default function PlanningPage() {
         {
           id: editingSessionId,
           data: {
+            planId: selectedPlanId,
             sessionDate,
             modality,
             title: title.trim(),
@@ -121,7 +153,7 @@ export default function PlanningPage() {
         },
         {
           onSuccess: () => {
-            invalidate();
+            invalidateSessions();
             resetForm();
           },
           onError: (error) => {
@@ -136,6 +168,7 @@ export default function PlanningPage() {
     createSession.mutate(
       {
         data: {
+          planId: selectedPlanId,
           sessionDate,
           modality,
           title: title.trim(),
@@ -147,7 +180,7 @@ export default function PlanningPage() {
       },
       {
         onSuccess: () => {
-          invalidate();
+          invalidateSessions();
           resetForm();
         },
         onError: (error) => {
@@ -159,12 +192,43 @@ export default function PlanningPage() {
   };
 
   const handleStatusCycle = (session: PlanningSession) => {
-    updateSession.mutate({ id: session.id, data: { status: nextStatus(session.status) } }, { onSuccess: invalidate });
+    updateSession.mutate(
+      { id: session.id, data: { status: nextStatus(session.status), planId: session.planId } },
+      { onSuccess: invalidateSessions },
+    );
   };
 
   const handleDelete = (sessionId: number) => {
     if (!confirm("Delete this session?")) return;
-    deleteSession.mutate({ id: sessionId }, { onSuccess: invalidate });
+    deleteSession.mutate({ id: sessionId }, { onSuccess: invalidateSessions });
+  };
+
+  const handleCreatePlan = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPlanError("");
+
+    const name = planName.trim();
+    if (!name) {
+      setPlanError("Planning name is required");
+      return;
+    }
+
+    createPlan.mutate(
+      { data: { name } },
+      {
+        onSuccess: (plan: PlanningPlan) => {
+          invalidatePlans();
+          setSelectedPlanId(plan.id);
+          setPlanName("");
+          setShowPlanForm(false);
+          resetForm();
+        },
+        onError: (error) => {
+          const message = error instanceof Error ? error.message : "Failed to create planning";
+          setPlanError(message);
+        },
+      },
+    );
   };
 
   const grouped = useMemo(() => {
@@ -200,6 +264,55 @@ export default function PlanningPage() {
       }
     >
       <div className="px-5 space-y-4">
+        <section className="bg-card border border-border rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Current planning</p>
+            <button
+              onClick={() => {
+                setShowPlanForm((s) => !s);
+                setPlanError("");
+              }}
+              className="text-xs font-semibold text-primary"
+            >
+              {showPlanForm ? "Cancel" : "New planning"}
+            </button>
+          </div>
+
+          <select
+            value={selectedPlanId ?? ""}
+            onChange={(e) => setSelectedPlanId(e.target.value ? parseInt(e.target.value, 10) : null)}
+            disabled={!hasPlans || isLoadingPlans}
+            className="w-full bg-background border border-border rounded-xl px-3 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm disabled:opacity-60"
+          >
+            {!hasPlans ? <option value="">No planning yet</option> : null}
+            {plans?.map((plan) => (
+              <option key={plan.id} value={plan.id}>
+                {plan.name}
+              </option>
+            ))}
+          </select>
+
+          {showPlanForm && (
+            <form onSubmit={handleCreatePlan} className="space-y-2">
+              <input
+                type="text"
+                value={planName}
+                onChange={(e) => setPlanName(e.target.value)}
+                placeholder="e.g. Prépa Semi-Marathon"
+                className="w-full bg-background border border-border rounded-xl px-3 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+              />
+              {planError && <p className="text-destructive text-xs">{planError}</p>}
+              <button
+                type="submit"
+                disabled={createPlan.isPending}
+                className="w-full bg-secondary text-foreground font-semibold py-2.5 rounded-xl text-sm disabled:opacity-60"
+              >
+                {createPlan.isPending ? "Creating..." : "Create planning"}
+              </button>
+            </form>
+          )}
+        </section>
+
         {showForm && (
           <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-4 space-y-4">
             <h3 className="font-semibold text-sm text-foreground">
@@ -295,7 +408,15 @@ export default function PlanningPage() {
           </form>
         )}
 
-        {isLoading ? (
+        {selectedPlanId == null ? (
+          <div className="flex flex-col items-center justify-center pt-12 text-center">
+            <div className="w-16 h-16 bg-card border border-border rounded-2xl flex items-center justify-center mb-4">
+              <CalendarDays size={28} className="text-muted-foreground" />
+            </div>
+            <p className="font-semibold text-foreground">Create your first planning</p>
+            <p className="text-sm text-muted-foreground mt-1">Give your planning a name to start organizing sessions</p>
+          </div>
+        ) : isLoading ? (
           <div className="space-y-3">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="h-24 bg-card border border-border rounded-2xl animate-pulse" />

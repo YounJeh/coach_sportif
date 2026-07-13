@@ -273,6 +273,11 @@ paths:
       operationId: listPlanningSessions
       tags: [planning]
       summary: List all planning sessions for the authenticated user
+      parameters:
+        - name: planId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: List of planning sessions
@@ -299,6 +304,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PlanningSession"
+
+  /planning/plans:
+    get:
+      operationId: listPlanningPlans
+      tags: [planning]
+      summary: List planning containers for the authenticated user
+      responses:
+        "200":
+          description: List of planning containers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlanningPlan"
+    post:
+      operationId: createPlanningPlan
+      tags: [planning]
+      summary: Create a planning container
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanningPlanInput"
+      responses:
+        "201":
+          description: Created planning container
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanningPlan"
 
   /planning/sessions/{id}:
     patch:
@@ -612,6 +649,7 @@ components:
         [
           id,
           userId,
+          planId,
           goalId,
           sessionDate,
           modality,
@@ -630,6 +668,8 @@ components:
           type: integer
         userId:
           type: string
+        planId:
+          type: integer
         goalId:
           type: ["integer", "null"]
         sessionDate:
@@ -664,8 +704,10 @@ components:
 
     PlanningSessionInput:
       type: object
-      required: [sessionDate, modality, title, targetDurationMin]
+      required: [planId, sessionDate, modality, title, targetDurationMin]
       properties:
+        planId:
+          type: integer
         goalId:
           type: ["integer", "null"]
         sessionDate:
@@ -699,6 +741,8 @@ components:
     PlanningSessionUpdate:
       type: object
       properties:
+        planId:
+          type: integer
         goalId:
           type: ["integer", "null"]
         sessionDate:
@@ -844,3 +888,28 @@ components:
       properties:
         savedSessions:
           type: integer
+
+    PlanningPlan:
+      type: object
+      required: [id, userId, name, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PlanningPlanInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1

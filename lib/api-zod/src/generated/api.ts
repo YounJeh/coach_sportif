@@ -315,9 +315,14 @@ export const DeleteGoalResponse = zod.void()
 /**
  * @summary List all planning sessions for the authenticated user
  */
+export const ListPlanningSessionsQueryParams = zod.object({
+  "planId": zod.coerce.number().optional()
+})
+
 export const ListPlanningSessionsResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.string(),
+  "planId": zod.number(),
   "goalId": zod.number().nullable(),
   "sessionDate": zod.coerce.date(),
   "modality": zod.enum(['running', 'strength', 'fitness', 'recovery']),
@@ -344,6 +349,7 @@ export const createPlanningSessionBodyTargetIntensityRpeMax = 10;
 
 
 export const CreatePlanningSessionBody = zod.object({
+  "planId": zod.number(),
   "goalId": zod.number().nullish(),
   "sessionDate": zod.coerce.date(),
   "modality": zod.enum(['running', 'strength', 'fitness', 'recovery']),
@@ -359,6 +365,7 @@ export const CreatePlanningSessionBody = zod.object({
 export const CreatePlanningSessionResponse = zod.object({
   "id": zod.number(),
   "userId": zod.string(),
+  "planId": zod.number(),
   "goalId": zod.number().nullable(),
   "sessionDate": zod.coerce.date(),
   "modality": zod.enum(['running', 'strength', 'fitness', 'recovery']),
@@ -369,6 +376,38 @@ export const CreatePlanningSessionResponse = zod.object({
   "planData": zod.record(zod.string(), zod.unknown()),
   "resultData": zod.record(zod.string(), zod.unknown()),
   "notes": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List planning containers for the authenticated user
+ */
+export const ListPlanningPlansResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "name": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListPlanningPlansResponse = zod.array(ListPlanningPlansResponseItem)
+
+
+/**
+ * @summary Create a planning container
+ */
+
+
+
+export const CreatePlanningPlanBody = zod.object({
+  "name": zod.string().min(1)
+})
+
+export const CreatePlanningPlanResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "name": zod.string(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -387,6 +426,7 @@ export const updatePlanningSessionBodyTargetIntensityRpeMax = 10;
 
 
 export const UpdatePlanningSessionBody = zod.object({
+  "planId": zod.number().optional(),
   "goalId": zod.number().nullish(),
   "sessionDate": zod.coerce.date().optional(),
   "modality": zod.enum(['running', 'strength', 'fitness', 'recovery']).optional(),
@@ -402,6 +442,7 @@ export const UpdatePlanningSessionBody = zod.object({
 export const UpdatePlanningSessionResponse = zod.object({
   "id": zod.number(),
   "userId": zod.string(),
+  "planId": zod.number(),
   "goalId": zod.number().nullable(),
   "sessionDate": zod.coerce.date(),
   "modality": zod.enum(['running', 'strength', 'fitness', 'recovery']),

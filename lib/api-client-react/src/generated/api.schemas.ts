@@ -128,6 +128,7 @@ export type PlanningSessionResultData = { [key: string]: unknown };
 export interface PlanningSession {
   id: number;
   userId: string;
+  planId: number;
   /** @nullable */
   goalId: number | null;
   sessionDate: string;
@@ -170,6 +171,7 @@ export type PlanningSessionInputPlanData = { [key: string]: unknown };
 export type PlanningSessionInputResultData = { [key: string]: unknown };
 
 export interface PlanningSessionInput {
+  planId: number;
   /** @nullable */
   goalId?: number | null;
   sessionDate: string;
@@ -216,6 +218,7 @@ export type PlanningSessionUpdatePlanData = { [key: string]: unknown };
 export type PlanningSessionUpdateResultData = { [key: string]: unknown };
 
 export interface PlanningSessionUpdate {
+  planId?: number;
   /** @nullable */
   goalId?: number | null;
   sessionDate?: string;
@@ -327,9 +330,26 @@ export interface CoachSavePlanResponse {
   savedSessions: number;
 }
 
+export interface PlanningPlan {
+  id: number;
+  userId: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlanningPlanInput {
+  /** @minLength 1 */
+  name: string;
+}
+
 export type ListWorkoutsParams = {
 limit?: number;
 offset?: number;
+};
+
+export type ListPlanningSessionsParams = {
+planId?: number;
 };
 
 export type GetProgressChartParams = {

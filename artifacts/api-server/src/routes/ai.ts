@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc } from "drizzle-orm";
-import { db, goalsTable, userSessionsTable, workoutsTable, workoutSetsTable } from "@workspace/db";
+import { eq, and, asc, desc } from "drizzle-orm";
+import { db, goalsTable, planningPlansTable, userSessionsTable, workoutsTable, workoutSetsTable } from "@workspace/db";
 import { AskCoachBody, SaveCoachPlanBody } from "@workspace/api-zod";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/auth.js";
 import { type Request } from "express";
@@ -12,6 +12,7 @@ const COACH_API_BASE_URL = process.env.COACH_API_BASE_URL ?? "https://coach-spor
 const AI_FALLBACK_REPLY =
   "Great effort! Based on your workout, I can see you're putting in the work. Focus on progressive overload - aim to add a small amount of weight or an extra rep each session. Make sure you're recovering well with quality sleep and adequate protein (0.8-1g per pound of bodyweight). Keep showing up consistently and the results will come!";
 const DEFAULT_AVAILABLE_SLOTS = ["Mon-07:00", "Sun-20:00"] as const;
+const DEFAULT_PLAN_NAME = "Planning principal";
 
 type PlanningStatus = "planned" | "done" | "skipped" | "adapted";
 
@@ -203,7 +204,28 @@ async function resolveObjectiveAndDeadline(userId: string, fallbackObjective: st
   return { objective, deadline };
 }
 
+async function ensureDefaultPlanId(userId: string): Promise<number> {
+  const [existing] = await db
+    .select()
+    .from(planningPlansTable)
+    .where(eq(planningPlansTable.userId, userId))
+    .orderBy(asc(planningPlansTable.createdAt))
+    .limit(1);
+
+  if (existing) {
+    return existing.id;
+  }
+
+  const [created] = await db
+    .insert(planningPlansTable)
+    .values({ userId, name: DEFAULT_PLAN_NAME })
+    .returning();
+
+  return created.id;
+}
+
 async function persistPlannedSessions(userId: string, sessions: NormalizedPlannedSession[]): Promise<number> {
+  const planId = await ensureDefaultPlanId(userId);
   let persistedCount = 0;
 
   for (const [index, session] of sessions.entries()) {
@@ -212,6 +234,7 @@ async function persistPlannedSessions(userId: string, sessions: NormalizedPlanne
         .insert(userSessionsTable)
         .values({
           userId,
+          planId,
           goalId: session.goalId,
           sessionDate: session.sessionDate,
           modality: session.modality,
@@ -225,7 +248,7 @@ async function persistPlannedSessions(userId: string, sessions: NormalizedPlanne
           notes: session.notes,
         })
         .onConflictDoUpdate({
-          target: [userSessionsTable.userId, userSessionsTable.sessionDate],
+          target: [userSessionsTable.userId, userSessionsTable.planId, userSessionsTable.sessionDate],
           set: {
             modality: session.modality,
             title: session.title,

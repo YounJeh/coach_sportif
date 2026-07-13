@@ -13,6 +13,7 @@ import type { PlanningSessionStatus } from './planningSessionStatus';
 export interface PlanningSession {
   id: number;
   userId: string;
+  planId: number;
   /** @nullable */
   goalId: number | null;
   sessionDate: Date;

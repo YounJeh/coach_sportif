@@ -48,9 +48,19 @@ CREATE TABLE IF NOT EXISTS goals (
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS planning_plans (
+  id SERIAL PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  CONSTRAINT planning_plans_user_name_unique UNIQUE (user_id, name)
+);
+
 CREATE TABLE IF NOT EXISTS user_sessions (
   id BIGSERIAL PRIMARY KEY,
   user_id TEXT NOT NULL,
+  plan_id INTEGER,
   goal_id INTEGER NULL REFERENCES goals(id) ON DELETE SET NULL,
   session_date DATE NOT NULL,
   modality TEXT NOT NULL CHECK (modality IN ('running', 'strength', 'fitness', 'recovery')),
@@ -67,11 +77,49 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   UNIQUE (user_id, session_date)
 );
 
+ALTER TABLE user_sessions
+  ADD COLUMN IF NOT EXISTS plan_id INTEGER;
+
+ALTER TABLE user_sessions
+  DROP CONSTRAINT IF EXISTS user_sessions_plan_id_fkey;
+
+ALTER TABLE user_sessions
+  ADD CONSTRAINT user_sessions_plan_id_fkey
+  FOREIGN KEY (plan_id) REFERENCES planning_plans(id) ON DELETE CASCADE;
+
+INSERT INTO planning_plans (user_id, name)
+SELECT DISTINCT us.user_id, 'Planning principal'
+FROM user_sessions us
+LEFT JOIN planning_plans pp
+  ON pp.user_id = us.user_id
+ AND pp.name = 'Planning principal'
+WHERE pp.id IS NULL;
+
+UPDATE user_sessions us
+SET plan_id = pp.id
+FROM planning_plans pp
+WHERE us.plan_id IS NULL
+  AND pp.user_id = us.user_id
+  AND pp.name = 'Planning principal';
+
+ALTER TABLE user_sessions
+  ALTER COLUMN plan_id SET NOT NULL;
+
+ALTER TABLE user_sessions
+  DROP CONSTRAINT IF EXISTS user_sessions_user_date_unique;
+
+ALTER TABLE user_sessions
+  DROP CONSTRAINT IF EXISTS user_sessions_user_plan_date_unique;
+
+ALTER TABLE user_sessions
+  ADD CONSTRAINT user_sessions_user_plan_date_unique UNIQUE (user_id, plan_id, session_date);
+
 CREATE INDEX IF NOT EXISTS idx_workouts_user_date ON workouts(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_goals_user_completed ON goals(user_id, completed);
 CREATE INDEX IF NOT EXISTS idx_workout_sets_workout_id ON workout_sets(workout_id);
-CREATE INDEX IF NOT EXISTS idx_user_sessions_user_date ON user_sessions(user_id, session_date);
-CREATE INDEX IF NOT EXISTS idx_user_sessions_user_status_date ON user_sessions(user_id, status, session_date);
+CREATE INDEX IF NOT EXISTS idx_planning_plans_user_created ON planning_plans(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_plan_date ON user_sessions(user_id, plan_id, session_date);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_plan_status_date ON user_sessions(user_id, plan_id, status, session_date);
 
 -- -----------------------------------------------------------------------------
 -- New user profiling and readiness tables
