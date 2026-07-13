@@ -22,6 +22,8 @@ import type {
 import type {
   CoachInput,
   CoachResponse,
+  CoachSavePlanInput,
+  CoachSavePlanResponse,
   Exercise,
   GetProgressChartParams,
   Goal,
@@ -1625,5 +1627,75 @@ export const useAskCoach = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getAskCoachMutationOptions(options));
+    }
+
+export const getSaveCoachPlanUrl = () => {
+
+
+
+
+  return `/api/ai/coach/save-plan`
+}
+
+/**
+ * @summary Save a coach-generated plan preview into planning sessions
+ */
+export const saveCoachPlan = async (coachSavePlanInput: CoachSavePlanInput, options?: RequestInit): Promise<CoachSavePlanResponse> => {
+
+  return customFetch<CoachSavePlanResponse>(getSaveCoachPlanUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(coachSavePlanInput)
+  }
+);}
+
+
+
+
+export const getSaveCoachPlanMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveCoachPlan>>, TError,{data: BodyType<CoachSavePlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveCoachPlan>>, TError,{data: BodyType<CoachSavePlanInput>}, TContext> => {
+
+const mutationKey = ['saveCoachPlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveCoachPlan>>, {data: BodyType<CoachSavePlanInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveCoachPlan(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveCoachPlanMutationResult = NonNullable<Awaited<ReturnType<typeof saveCoachPlan>>>
+    export type SaveCoachPlanMutationBody = BodyType<CoachSavePlanInput>
+    export type SaveCoachPlanMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save a coach-generated plan preview into planning sessions
+ */
+export const useSaveCoachPlan = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveCoachPlan>>, TError,{data: BodyType<CoachSavePlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveCoachPlan>>,
+        TError,
+        {data: BodyType<CoachSavePlanInput>},
+        TContext
+      > => {
+      return useMutation(getSaveCoachPlanMutationOptions(options));
     }
 

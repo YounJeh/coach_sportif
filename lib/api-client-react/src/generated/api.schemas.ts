@@ -264,11 +264,67 @@ export interface CoachInput {
   workoutId?: number | null;
 }
 
+export type CoachPlannedSessionPreviewModality = typeof CoachPlannedSessionPreviewModality[keyof typeof CoachPlannedSessionPreviewModality];
+
+
+export const CoachPlannedSessionPreviewModality = {
+  running: 'running',
+  strength: 'strength',
+  fitness: 'fitness',
+  recovery: 'recovery',
+} as const;
+
+export type CoachPlannedSessionPreviewStatus = typeof CoachPlannedSessionPreviewStatus[keyof typeof CoachPlannedSessionPreviewStatus];
+
+
+export const CoachPlannedSessionPreviewStatus = {
+  planned: 'planned',
+  done: 'done',
+  skipped: 'skipped',
+  adapted: 'adapted',
+} as const;
+
+export type CoachPlannedSessionPreviewPlanData = { [key: string]: unknown };
+
+export type CoachPlannedSessionPreviewResultData = { [key: string]: unknown };
+
+export interface CoachPlannedSessionPreview {
+  /** @nullable */
+  goalId?: number | null;
+  sessionDate: string;
+  modality: CoachPlannedSessionPreviewModality;
+  /** @minLength 1 */
+  title: string;
+  /** @minimum 1 */
+  targetDurationMin: number;
+  /**
+     * @minimum 1
+     * @maximum 10
+     * @nullable
+     */
+  targetIntensityRpe?: number | null;
+  status?: CoachPlannedSessionPreviewStatus;
+  planData?: CoachPlannedSessionPreviewPlanData;
+  resultData?: CoachPlannedSessionPreviewResultData;
+  /** @nullable */
+  notes?: string | null;
+}
+
 export interface CoachResponse {
   reply: string;
   /** @nullable */
   briefingAthlete?: string | null;
   plannedSessions?: number;
+  planPreview?: CoachPlannedSessionPreview[];
+}
+
+export interface CoachSavePlanInput {
+  /** @minItems 1 */
+  sessions: CoachPlannedSessionPreview[];
+}
+
+export interface CoachSavePlanResponse {
+  savedSessions: number;
 }
 
 export type ListWorkoutsParams = {

@@ -410,6 +410,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/CoachResponse"
 
+  /ai/coach/save-plan:
+    post:
+      operationId: saveCoachPlan
+      tags: [ai]
+      summary: Save a coach-generated plan preview into planning sessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CoachSavePlanInput"
+      responses:
+        "200":
+          description: Plan saved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoachSavePlanResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -769,4 +788,59 @@ components:
         briefingAthlete:
           type: ["string", "null"]
         plannedSessions:
+          type: integer
+        planPreview:
+          type: array
+          items:
+            $ref: "#/components/schemas/CoachPlannedSessionPreview"
+
+    CoachPlannedSessionPreview:
+      type: object
+      required: [sessionDate, modality, title, targetDurationMin]
+      properties:
+        goalId:
+          type: ["integer", "null"]
+        sessionDate:
+          type: string
+          format: date
+        modality:
+          type: string
+          enum: [running, strength, fitness, recovery]
+        title:
+          type: string
+          minLength: 1
+        targetDurationMin:
+          type: integer
+          minimum: 1
+        targetIntensityRpe:
+          type: ["number", "null"]
+          minimum: 1
+          maximum: 10
+        status:
+          type: string
+          enum: [planned, done, skipped, adapted]
+        planData:
+          type: object
+          additionalProperties: true
+        resultData:
+          type: object
+          additionalProperties: true
+        notes:
+          type: ["string", "null"]
+
+    CoachSavePlanInput:
+      type: object
+      required: [sessions]
+      properties:
+        sessions:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CoachPlannedSessionPreview"
+
+    CoachSavePlanResponse:
+      type: object
+      required: [savedSessions]
+      properties:
+        savedSessions:
           type: integer

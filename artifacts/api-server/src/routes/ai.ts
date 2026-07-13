@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import { db, goalsTable, userSessionsTable, workoutsTable, workoutSetsTable } from "@workspace/db";
-import { AskCoachBody } from "@workspace/api-zod";
+import { AskCoachBody, SaveCoachPlanBody } from "@workspace/api-zod";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/auth.js";
 import { type Request } from "express";
 import { logger } from "../lib/logger.js";
@@ -134,6 +134,45 @@ function normalizePlannedSessions(payload: unknown): NormalizedPlannedSession[] 
       notes: asString(item.notes),
       planData,
       resultData,
+    });
+  }
+
+  return normalized;
+}
+
+function normalizePreviewSessions(value: unknown): NormalizedPlannedSession[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const normalized: NormalizedPlannedSession[] = [];
+
+  for (const entry of value) {
+    const item = asObject(entry);
+    if (!item) continue;
+
+    const rawDate = item.sessionDate;
+    const dateOnly =
+      rawDate instanceof Date && !Number.isNaN(rawDate.getTime())
+        ? rawDate.toISOString().split("T")[0]
+        : toDateOnly(String(rawDate ?? ""));
+    if (!dateOnly) continue;
+
+    const duration = asNumber(item.targetDurationMin) ?? 45;
+    const intensity = asNumber(item.targetIntensityRpe);
+    const goalId = asNumber(item.goalId);
+
+    normalized.push({
+      goalId: goalId == null ? null : Math.round(goalId),
+      sessionDate: dateOnly,
+      modality: normalizeModality(item.modality),
+      title: asString(item.title) ?? "Planned session",
+      targetDurationMin: Math.max(1, Math.round(duration)),
+      targetIntensityRpe: intensity == null ? null : Math.max(1, Math.min(10, intensity)),
+      status: normalizeStatus(item.status),
+      notes: asString(item.notes),
+      planData: asObject(item.planData) ?? {},
+      resultData: asObject(item.resultData) ?? {},
     });
   }
 
@@ -288,7 +327,7 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
         },
         "Coach IA API returned an error",
       );
-      res.json({ reply: AI_FALLBACK_REPLY, briefingAthlete: null, plannedSessions: 0 });
+      res.json({ reply: AI_FALLBACK_REPLY, briefingAthlete: null, plannedSessions: 0, planPreview: [] });
       return;
     }
 
@@ -298,36 +337,52 @@ router.post("/ai/coach", requireAuth, async (req: Request, res): Promise<void> =
     const briefingAthlete = extractBriefingAthlete(payload);
     const plannedSessions = normalizePlannedSessions(payload);
 
-    let persistedSessions = 0;
-    if (plannedSessions.length > 0) {
-      persistedSessions = await persistPlannedSessions(userId, plannedSessions);
-    }
-
     const root = asObject(payload);
     const externalReply = asString(root?.reply) ?? asString(root?.message);
     const reply =
       externalReply ??
       briefingCoach ??
-      "Plan generated successfully. Your sessions are being saved to your planning tab.";
+      "Plan generated successfully. Review it and save it to your planning tab when ready.";
 
     res.json({
       reply,
       briefingAthlete,
       plannedSessions: plannedSessions.length,
+      planPreview: plannedSessions,
     });
 
     logger.info(
       {
         userId,
         plannedSessions: plannedSessions.length,
-        persistedSessions,
       },
-      "AI coach plan persisted",
+      "AI coach plan generated",
     );
   } catch (err) {
     logger.error({ err, userId }, "AI coach request failed, using fallback");
-    res.json({ reply: AI_FALLBACK_REPLY, briefingAthlete: null, plannedSessions: 0 });
+    res.json({ reply: AI_FALLBACK_REPLY, briefingAthlete: null, plannedSessions: 0, planPreview: [] });
   }
+});
+
+router.post("/ai/coach/save-plan", requireAuth, async (req: Request, res): Promise<void> => {
+  const userId = (req as AuthenticatedRequest).userId;
+  const parsed = SaveCoachPlanBody.safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const sessions = normalizePreviewSessions(parsed.data.sessions);
+
+  if (sessions.length === 0) {
+    res.status(400).json({ error: "No valid session to save" });
+    return;
+  }
+
+  const savedSessions = await persistPlannedSessions(userId, sessions);
+  logger.info({ userId, savedSessions }, "AI coach plan saved by user");
+  res.json({ savedSessions });
 });
 
 export default router;

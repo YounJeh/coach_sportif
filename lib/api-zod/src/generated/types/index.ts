@@ -7,7 +7,14 @@
  */
 
 export * from './coachInput';
+export * from './coachPlannedSessionPreview';
+export * from './coachPlannedSessionPreviewModality';
+export * from './coachPlannedSessionPreviewPlanData';
+export * from './coachPlannedSessionPreviewResultData';
+export * from './coachPlannedSessionPreviewStatus';
 export * from './coachResponse';
+export * from './coachSavePlanInput';
+export * from './coachSavePlanResponse';
 export * from './exercise';
 export * from './getProgressChartParams';
 export * from './goal';

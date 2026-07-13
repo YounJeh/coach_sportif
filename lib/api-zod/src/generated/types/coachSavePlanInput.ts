@@ -7,10 +7,7 @@
  */
 import type { CoachPlannedSessionPreview } from './coachPlannedSessionPreview';
 
-export interface CoachResponse {
-  reply: string;
-  /** @nullable */
-  briefingAthlete?: string | null;
-  plannedSessions?: number;
-  planPreview?: CoachPlannedSessionPreview[];
+export interface CoachSavePlanInput {
+  /** @minItems 1 */
+  sessions: CoachPlannedSessionPreview[];
 }

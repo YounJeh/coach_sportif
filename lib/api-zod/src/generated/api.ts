@@ -478,10 +478,58 @@ export const AskCoachBody = zod.object({
   "workoutId": zod.number().nullish()
 })
 
+
+
+export const askCoachResponsePlanPreviewItemTargetIntensityRpeMax = 10;
+
+
+
 export const AskCoachResponse = zod.object({
   "reply": zod.string(),
   "briefingAthlete": zod.string().nullish(),
-  "plannedSessions": zod.number().optional()
+  "plannedSessions": zod.number().optional(),
+  "planPreview": zod.array(zod.object({
+  "goalId": zod.number().nullish(),
+  "sessionDate": zod.coerce.date(),
+  "modality": zod.enum(['running', 'strength', 'fitness', 'recovery']),
+  "title": zod.string().min(1),
+  "targetDurationMin": zod.number().min(1),
+  "targetIntensityRpe": zod.number().min(1).max(askCoachResponsePlanPreviewItemTargetIntensityRpeMax).nullish(),
+  "status": zod.enum(['planned', 'done', 'skipped', 'adapted']).optional(),
+  "planData": zod.record(zod.string(), zod.unknown()).optional(),
+  "resultData": zod.record(zod.string(), zod.unknown()).optional(),
+  "notes": zod.string().nullish()
+})).optional()
+})
+
+
+/**
+ * @summary Save a coach-generated plan preview into planning sessions
+ */
+
+
+export const saveCoachPlanBodySessionsItemTargetIntensityRpeMax = 10;
+
+
+
+
+export const SaveCoachPlanBody = zod.object({
+  "sessions": zod.array(zod.object({
+  "goalId": zod.number().nullish(),
+  "sessionDate": zod.coerce.date(),
+  "modality": zod.enum(['running', 'strength', 'fitness', 'recovery']),
+  "title": zod.string().min(1),
+  "targetDurationMin": zod.number().min(1),
+  "targetIntensityRpe": zod.number().min(1).max(saveCoachPlanBodySessionsItemTargetIntensityRpeMax).nullish(),
+  "status": zod.enum(['planned', 'done', 'skipped', 'adapted']).optional(),
+  "planData": zod.record(zod.string(), zod.unknown()).optional(),
+  "resultData": zod.record(zod.string(), zod.unknown()).optional(),
+  "notes": zod.string().nullish()
+})).min(1)
+})
+
+export const SaveCoachPlanResponse = zod.object({
+  "savedSessions": zod.number()
 })
 
 
