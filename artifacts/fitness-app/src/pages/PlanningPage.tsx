@@ -11,7 +11,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/AppShell";
-import { CalendarDays, Clock3, Plus, Trash2, X } from "lucide-react";
+import { CalendarDays, Clock3, Pencil, Plus, Trash2, X } from "lucide-react";
 
 const modalities: Array<{ value: PlanningSessionInputModality; label: string }> = [
   { value: "running", label: "Running" },
@@ -57,11 +57,36 @@ export default function PlanningPage() {
   const [targetIntensityRpe, setTargetIntensityRpe] = useState("");
   const [notes, setNotes] = useState("");
   const [formError, setFormError] = useState("");
+  const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: getListPlanningSessionsQueryKey() });
 
-  const handleCreate = (e: React.FormEvent) => {
+  const resetForm = () => {
+    setShowForm(false);
+    setSessionDate(new Date().toISOString().slice(0, 10));
+    setTitle("");
+    setModality("fitness");
+    setTargetDurationMin("45");
+    setTargetIntensityRpe("");
+    setNotes("");
+    setFormError("");
+    setEditingSessionId(null);
+  };
+
+  const startEditing = (session: PlanningSession) => {
+    setShowForm(true);
+    setEditingSessionId(session.id);
+    setSessionDate(session.sessionDate);
+    setTitle(session.title);
+    setModality(session.modality);
+    setTargetDurationMin(String(session.targetDurationMin));
+    setTargetIntensityRpe(session.targetIntensityRpe == null ? "" : String(session.targetIntensityRpe));
+    setNotes(session.notes ?? "");
+    setFormError("");
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
 
@@ -81,6 +106,33 @@ export default function PlanningPage() {
       return;
     }
 
+    if (editingSessionId != null) {
+      updateSession.mutate(
+        {
+          id: editingSessionId,
+          data: {
+            sessionDate,
+            modality,
+            title: title.trim(),
+            targetDurationMin: duration,
+            targetIntensityRpe: intensity ?? null,
+            notes: notes.trim() || null,
+          },
+        },
+        {
+          onSuccess: () => {
+            invalidate();
+            resetForm();
+          },
+          onError: (error) => {
+            const message = error instanceof Error ? error.message : "Failed to update session";
+            setFormError(message);
+          },
+        },
+      );
+      return;
+    }
+
     createSession.mutate(
       {
         data: {
@@ -96,11 +148,7 @@ export default function PlanningPage() {
       {
         onSuccess: () => {
           invalidate();
-          setShowForm(false);
-          setTitle("");
-          setTargetDurationMin("45");
-          setTargetIntensityRpe("");
-          setNotes("");
+          resetForm();
         },
         onError: (error) => {
           const message = error instanceof Error ? error.message : "Failed to create session";
@@ -135,7 +183,16 @@ export default function PlanningPage() {
       title="Planning"
       action={
         <button
-          onClick={() => setShowForm((s) => !s)}
+          onClick={() => {
+            if (showForm) {
+              resetForm();
+              return;
+            }
+
+            setShowForm(true);
+            setEditingSessionId(null);
+            setFormError("");
+          }}
           className="w-9 h-9 bg-primary text-primary-foreground rounded-xl flex items-center justify-center"
         >
           {showForm ? <X size={18} /> : <Plus size={18} strokeWidth={2.5} />}
@@ -144,8 +201,10 @@ export default function PlanningPage() {
     >
       <div className="px-5 space-y-4">
         {showForm && (
-          <form onSubmit={handleCreate} className="bg-card border border-border rounded-2xl p-4 space-y-4">
-            <h3 className="font-semibold text-sm text-foreground">New Session</h3>
+          <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-4 space-y-4">
+            <h3 className="font-semibold text-sm text-foreground">
+              {editingSessionId != null ? "Edit Session" : "New Session"}
+            </h3>
 
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Date</label>
@@ -224,10 +283,14 @@ export default function PlanningPage() {
             {formError && <p className="text-destructive text-xs">{formError}</p>}
             <button
               type="submit"
-              disabled={createSession.isPending}
+              disabled={createSession.isPending || updateSession.isPending}
               className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl text-sm disabled:opacity-60"
             >
-              {createSession.isPending ? "Saving..." : "Create Session"}
+              {createSession.isPending || updateSession.isPending
+                ? "Saving..."
+                : editingSessionId != null
+                  ? "Update Session"
+                  : "Create Session"}
             </button>
           </form>
         )}
@@ -279,6 +342,13 @@ export default function PlanningPage() {
                             title="Cycle status"
                           >
                             {session.status}
+                          </button>
+                          <button
+                            onClick={() => startEditing(session)}
+                            className="w-7 h-7 rounded-lg bg-secondary text-muted-foreground flex items-center justify-center"
+                            title="Edit"
+                          >
+                            <Pencil size={13} />
                           </button>
                           <button
                             onClick={() => handleDelete(session.id)}
