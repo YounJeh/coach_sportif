@@ -549,12 +549,14 @@ export const AskCoachResponse = zod.object({
  */
 
 
+
 export const saveCoachPlanBodySessionsItemTargetIntensityRpeMax = 10;
 
 
 
 
 export const SaveCoachPlanBody = zod.object({
+  "planName": zod.string().min(1).optional(),
   "sessions": zod.array(zod.object({
   "goalId": zod.number().nullish(),
   "sessionDate": zod.coerce.date(),
@@ -570,7 +572,9 @@ export const SaveCoachPlanBody = zod.object({
 })
 
 export const SaveCoachPlanResponse = zod.object({
-  "savedSessions": zod.number()
+  "savedSessions": zod.number(),
+  "planId": zod.number(),
+  "planName": zod.string()
 })
 
 

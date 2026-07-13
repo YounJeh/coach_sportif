@@ -8,6 +8,8 @@
 import type { CoachPlannedSessionPreview } from './coachPlannedSessionPreview';
 
 export interface CoachSavePlanInput {
+  /** @minLength 1 */
+  planName?: string;
   /** @minItems 1 */
   sessions: CoachPlannedSessionPreview[];
 }

@@ -204,7 +204,7 @@ async function resolveObjectiveAndDeadline(userId: string, fallbackObjective: st
   return { objective, deadline };
 }
 
-async function ensureDefaultPlanId(userId: string): Promise<number> {
+async function ensureDefaultPlan(userId: string): Promise<{ id: number; name: string }> {
   const [existing] = await db
     .select()
     .from(planningPlansTable)
@@ -213,7 +213,7 @@ async function ensureDefaultPlanId(userId: string): Promise<number> {
     .limit(1);
 
   if (existing) {
-    return existing.id;
+    return { id: existing.id, name: existing.name };
   }
 
   const [created] = await db
@@ -221,11 +221,56 @@ async function ensureDefaultPlanId(userId: string): Promise<number> {
     .values({ userId, name: DEFAULT_PLAN_NAME })
     .returning();
 
-  return created.id;
+  return { id: created.id, name: created.name };
 }
 
-async function persistPlannedSessions(userId: string, sessions: NormalizedPlannedSession[]): Promise<number> {
-  const planId = await ensureDefaultPlanId(userId);
+async function ensurePlanForSave(userId: string, requestedPlanName?: string): Promise<{ id: number; name: string }> {
+  const planName = requestedPlanName?.trim();
+
+  if (!planName) {
+    return ensureDefaultPlan(userId);
+  }
+
+  const [existing] = await db
+    .select()
+    .from(planningPlansTable)
+    .where(and(eq(planningPlansTable.userId, userId), eq(planningPlansTable.name, planName)))
+    .limit(1);
+
+  if (existing) {
+    return { id: existing.id, name: existing.name };
+  }
+
+  try {
+    const [created] = await db
+      .insert(planningPlansTable)
+      .values({ userId, name: planName })
+      .returning();
+
+    return { id: created.id, name: created.name };
+  } catch (error) {
+    const dbCode =
+      typeof error === "object" && error && "cause" in error
+        ? (error as { cause?: { code?: string } }).cause?.code
+        : undefined;
+
+    if (dbCode === "23505") {
+      const [conflicted] = await db
+        .select()
+        .from(planningPlansTable)
+        .where(and(eq(planningPlansTable.userId, userId), eq(planningPlansTable.name, planName)))
+        .limit(1);
+
+      if (conflicted) {
+        return { id: conflicted.id, name: conflicted.name };
+      }
+    }
+
+    throw error;
+  }
+}
+
+async function persistPlannedSessions(userId: string, planId: number, sessions: NormalizedPlannedSession[]): Promise<number> {
   let persistedCount = 0;
 
   for (const [index, session] of sessions.entries()) {
@@ -403,9 +448,10 @@ router.post("/ai/coach/save-plan", requireAuth, async (req: Request, res): Promi
     return;
   }
 
-  const savedSessions = await persistPlannedSessions(userId, sessions);
-  logger.info({ userId, savedSessions }, "AI coach plan saved by user");
-  res.json({ savedSessions });
+  const plan = await ensurePlanForSave(userId, parsed.data.planName);
+  const savedSessions = await persistPlannedSessions(userId, plan.id, sessions);
+  logger.info({ userId, savedSessions, planId: plan.id, planName: plan.name }, "AI coach plan saved by user");
+  res.json({ savedSessions, planId: plan.id, planName: plan.name });
 });
 
 export default router;

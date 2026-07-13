@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useSearch } from "wouter";
 import {
   useAskCoach,
+  getListPlanningPlansQueryKey,
   useListWorkouts,
   useSaveCoachPlan,
   getListPlanningSessionsQueryKey,
@@ -25,6 +26,7 @@ type PlanPreviewMessage = {
   role: "assistant";
   kind: "plan-preview";
   sessions: CoachPlannedSessionPreview[];
+  planName: string;
   state: PlanCardState;
   error: string | null;
 };
@@ -62,10 +64,12 @@ function MessageBubble({
   message,
   onSavePlan,
   onDismissPlan,
+  onPlanNameChange,
 }: {
   message: Message;
-  onSavePlan: (id: number, sessions: CoachPlannedSessionPreview[]) => void;
+  onSavePlan: (id: number, sessions: CoachPlannedSessionPreview[], planName: string) => void;
   onDismissPlan: (id: number) => void;
+  onPlanNameChange: (id: number, value: string) => void;
 }) {
   if (message.kind === "text") {
     return (
@@ -151,6 +155,20 @@ function MessageBubble({
             ))}
           </div>
 
+          <div className="mt-3">
+            <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+              Planning name
+            </label>
+            <input
+              type="text"
+              value={message.planName}
+              onChange={(e) => onPlanNameChange(message.id, e.target.value)}
+              disabled={message.state === "saving" || message.state === "saved"}
+              placeholder="e.g. IA Plan - 8 weeks"
+              className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60"
+            />
+          </div>
+
           {message.state === "saved" && (
             <div className="mt-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 font-medium flex items-center gap-2">
               <CheckCircle2 size={14} /> Planning saved. You can find it in the Planning tab.
@@ -172,7 +190,7 @@ function MessageBubble({
           {(message.state === "idle" || message.state === "saving" || message.state === "error") && (
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
-                onClick={() => onSavePlan(message.id, message.sessions)}
+                onClick={() => onSavePlan(message.id, message.sessions, message.planName)}
                 disabled={message.state === "saving"}
                 className="h-10 rounded-xl bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
               >
@@ -241,14 +259,32 @@ export default function AiCoachPage() {
     );
   };
 
-  const handleSavePlan = (id: number, sessions: CoachPlannedSessionPreview[]) => {
+  const handlePlanNameChange = (id: number, value: string) => {
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== id || msg.kind !== "plan-preview") {
+          return msg;
+        }
+
+        return { ...msg, planName: value };
+      }),
+    );
+  };
+
+  const handleSavePlan = (id: number, sessions: CoachPlannedSessionPreview[], planName: string) => {
+    if (!planName.trim()) {
+      setPlanMessageState(id, "error", "Please enter a planning name before saving.");
+      return;
+    }
+
     setPlanMessageState(id, "saving", null);
 
     saveCoachPlan.mutate(
-      { data: { sessions } },
+      { data: { sessions, planName: planName.trim() } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListPlanningSessionsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListPlanningPlansQueryKey() });
           setPlanMessageState(id, "saved", null);
         },
         onError: (error) => {
@@ -280,11 +316,15 @@ export default function AiCoachPage() {
             }
             next.push({ id: nextMessageId(), role: "assistant", kind: "text", content: data.reply });
             if (data.planPreview && data.planPreview.length > 0) {
+              const start = new Date(data.planPreview[0].sessionDate);
+              const end = new Date(data.planPreview[data.planPreview.length - 1].sessionDate);
+              const dateLabel = `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
               next.push({
                 id: nextMessageId(),
                 role: "assistant",
                 kind: "plan-preview",
                 sessions: data.planPreview,
+                planName: `AI Plan ${dateLabel}`,
                 state: "idle",
                 error: null,
               });
@@ -339,7 +379,13 @@ export default function AiCoachPage() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-5 pb-4 space-y-4">
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} onSavePlan={handleSavePlan} onDismissPlan={handleDismissPlan} />
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              onSavePlan={handleSavePlan}
+              onDismissPlan={handleDismissPlan}
+              onPlanNameChange={handlePlanNameChange}
+            />
           ))}
           {askCoach.isPending && (
             <div className="flex gap-3">

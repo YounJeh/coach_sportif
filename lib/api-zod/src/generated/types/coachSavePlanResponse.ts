@@ -8,4 +8,6 @@
 
 export interface CoachSavePlanResponse {
   savedSessions: number;
+  planId: number;
+  planName: string;
 }

@@ -322,12 +322,16 @@ export interface CoachResponse {
 }
 
 export interface CoachSavePlanInput {
+  /** @minLength 1 */
+  planName?: string;
   /** @minItems 1 */
   sessions: CoachPlannedSessionPreview[];
 }
 
 export interface CoachSavePlanResponse {
   savedSessions: number;
+  planId: number;
+  planName: string;
 }
 
 export interface PlanningPlan {
