@@ -73,8 +73,7 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   result_data JSONB NOT NULL DEFAULT '{}'::jsonb,
   notes TEXT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  UNIQUE (user_id, session_date)
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE user_sessions
@@ -107,6 +106,9 @@ ALTER TABLE user_sessions
 
 ALTER TABLE user_sessions
   DROP CONSTRAINT IF EXISTS user_sessions_user_date_unique;
+
+ALTER TABLE user_sessions
+  DROP CONSTRAINT IF EXISTS user_sessions_user_id_session_date_key;
 
 ALTER TABLE user_sessions
   DROP CONSTRAINT IF EXISTS user_sessions_user_plan_date_unique;
